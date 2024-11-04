@@ -1,7 +1,8 @@
-aux_source_directory(${CMAKE_CURRENT_LIST_DIR} BNN_SRC)
+add_subdirectory(core)
+add_subdirectory(func)
 
-add_library(BnnSrc ${BNN_SRC})
-
-target_link_libraries(BnnSrc
-    PRIVATE cjson m  # 私有链接库
-)
+add_executable(${PROJECT_NAME} main.c)
+target_link_libraries(${PROJECT_NAME} core func net)
+if (CONFIG_TEST_ENABLE)
+    target_link_libraries(${PROJECT_NAME} test)
+endif()

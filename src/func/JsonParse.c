@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #define DEBUG
 #include "utils.h"
 #include <cjson/cJSON.h>  // cJSON 库的头文件
@@ -583,14 +586,14 @@ Net_List *obj_type_detech_create(cJSON *state_dict){
 }
 
 Net_List *json_model_parse(char* file_name) {
-    // 1. 打开并读取 model.json 文件
+    // 打开并读取 model.json 文件
     FILE *fp = fopen(file_name, "r");
     if (fp == NULL) {
         perror("Error opening file");
         return NULL;
     }
 
-    // 2. 获取文件大小并读取文件内容
+    // 获取文件大小并读取文件内容
     fseek(fp, 0, SEEK_END);
     long file_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
@@ -601,7 +604,7 @@ Net_List *json_model_parse(char* file_name) {
 
     fclose(fp);
 
-    // 3. 使用 cJSON 解析 JSON 数据
+    // 使用 cJSON 解析 JSON 数据
     cJSON *root = cJSON_Parse(json_buffer);
     if (root == NULL) {
         const char *error_ptr = cJSON_GetErrorPtr();
@@ -611,7 +614,7 @@ Net_List *json_model_parse(char* file_name) {
         return NULL;
     }
 
-    // 4. 获取 state_dict 对象
+    // 获取 state_dict 对象
     cJSON *state_dict = cJSON_GetObjectItemCaseSensitive(root, "state_dict");
     if (!cJSON_IsObject(state_dict)) {
         fprintf(stderr, "Error: state_dict is not an object\n");
@@ -621,7 +624,7 @@ Net_List *json_model_parse(char* file_name) {
     Net_List *Net = obj_type_detech_create(state_dict);
     Net_Binary(Net);
 
-    // 7. 释放 cJSON 结构体并释放内存
+    // 释放 cJSON 结构体并释放内存
     cJSON_Delete(root);
     free(json_buffer);
 

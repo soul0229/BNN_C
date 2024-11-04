@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include "conv.h"
+#include "utils.h"
 
 char net_lable[107][64] = {
     "conv1.weight", "bn1.weight", "bn1.bias", "bn1.running_mean", "bn1.running_var", 

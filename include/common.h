@@ -1,18 +1,11 @@
-#ifndef _COMMOM_H
-#define _COMMOM_H
+#ifndef __COMMOM_H__
+#define __COMMOM_H__
 
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 #include <stdbool.h>
 
-#define DATA_LEN 8
-#define USE_PADDING_ZERO
-#define SIZE 3
-#define RGB_DBG
-#define NET_START (64)
-#define DATA_START (4096*5)
+#define align16(x)    (((x)+(16-1))-(((x)+(16-1))%16))
+#define PARTSIZE(type,mem) ((unsigned long)(&(((type *)0)->mem)))
 
 #if defined(RGB_DBG)
 #define clrprint(clr,str,...) printf("\033[%dm" str "\033[0m",clr,##__VA_ARGS__)

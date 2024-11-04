@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include "conv.h"
 
 extern const conv_offset offset[];
