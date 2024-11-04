@@ -1,0 +1,9 @@
+*.json
+./*/*.o
+./*/*.out
+*.out
+*.txt
+!CMakeLists.txt
+bnn
+build/
+.cache/
