@@ -18,13 +18,7 @@
     #error "DATA_LEN error!"
 #endif
 
-enum data_len{
-    UNKNOW = 0,
-    BINARY,
-    TWO_BYTE,
-    FLOAT_BYTE,
-};
-typedef enum data_len Data_Len;
+
 
 enum data_type{
     KERNEL = 0,

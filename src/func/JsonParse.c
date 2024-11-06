@@ -1,7 +1,8 @@
+#define DEBUG
+#include "conv.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define DEBUG
 #include "utils.h"
 #include <cjson/cJSON.h>  // cJSON 库的头文件
 
@@ -280,7 +281,7 @@ void net_layer_add_data(Layer *layer, void *obj){
     }
 }
 
-void read_json_data(cJSON *state_dict, char *lable, float *data){
+static void read_json_data(cJSON *state_dict, char *lable, float *data){
     cJSON *conv_weight = NULL;
         // 5. 获取 conv1.weight 数组
     conv_weight = cJSON_GetObjectItemCaseSensitive(state_dict, lable);

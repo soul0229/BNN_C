@@ -1,6 +1,9 @@
-#ifndef _UTILS_H
-#define _UTILS_H
+#ifndef __UTILS_H__
+#define __UTILS_H__
+#include "stdio.h"
 #include "conv.h"
+#include <stdint.h>
+
 
 
 void net_lists_add(Net_List *list, void *obj);
@@ -14,5 +17,8 @@ Net_List *load_net(char* file_name, uint64_t next, FILE *fp, Layer *last_stage);
 void print_net_data(Net_List *Net);
 
 Activate_TypeDef *batchnorm_pcs(Activate_TypeDef *activate, BatchNorm *bn);
+
+
+void json_model_parse_v2(char* file_name);
 
 #endif

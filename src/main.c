@@ -80,8 +80,8 @@ int main(int argc, char *argv[]) {
             
             if(!output)
                 output = "model.ml";
-
-            NetStorage(json_model_parse(file), NULL, NULL, NULL, output);
+            json_model_parse_v2(file);
+            // NetStorage(json_model_parse(file), NULL, NULL, NULL, output);
             break;
         case TEST:break;
         default:

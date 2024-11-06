@@ -8,4 +8,6 @@
 #define NET_START (64)
 #define DATA_START (4096*5)
 
+#define DIM_DEPTH 4
+
 #endif
