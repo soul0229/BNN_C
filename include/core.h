@@ -16,46 +16,55 @@ typedef struct header {
     char arguments[12];
 } header_t;
 
-struct list_head {
-	struct list_head *next, *prev;
-};
-static inline void INIT_LIST_HEAD(struct list_head *list)
-{
-	list->next = list;
-	list->prev = list;
-}
+typedef enum Type_Struct{
+    TERROR=0,   /* error type. */
 
-typedef enum datatype{
-    DTUNKNOW = 0,
-    DTCONV,
-    DTBN,
-    DTSHORTCUT,
-    DTLINER,
-} DATA_TYPE;
+    NET_ROOT,   /* The root of net. */
+
+    TLAYER,     /* container type. */
+    TSHORTCUT,
+
+    TCONV,      /* data type. */
+    TBACHNORM,
+    TLINER,
+    TMAX,
+} Tstruct;
 
 struct data_info{
-    DATA_TYPE type;
-    Data_Len len;
+    Tstruct type;
+    Tstruct *parent;
+    Tstruct *reserve[2];
     char name[16];
+    Data_Len len;
     uint32_t dim[DIM_DEPTH];
-    struct data_info *sibling;
     void *data;
 };
 typedef struct data_info data_info_t;
 
-struct object{
+struct container{
+    Tstruct type;
+    Tstruct *parent;
+    Tstruct *sibling;
+    Tstruct *child;
     char name[16];
-    struct object *parent;
-    struct object *sibling;
-    struct object *child;
-    struct data_info *info;
 };
-typedef struct object object_t;
+typedef struct container container_t;
 
 struct net{
-    char name[32];
-    struct object *start;
+    Tstruct type;
+    Tstruct *reserve[2];
+    Tstruct *child;
+    char name[32]; 
     void (*process)(struct data_info*);
 };
+
+struct common{
+    Tstruct type;
+    Tstruct *parent;
+    Tstruct *sibling;
+    Tstruct *child;
+    char name[16];
+};
+typedef struct common common_t;
 
 #endif
