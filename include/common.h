@@ -12,6 +12,7 @@
 #else
 #define clrprint(clr,str,...) printf(str,##__VA_ARGS__)
 #endif
+
 #define eprint(str,...) clrprint(31,str,##__VA_ARGS__)
 #define iprint(str,...) clrprint(32,str,##__VA_ARGS__)
 #define wprint(str,...) clrprint(33,str,##__VA_ARGS__)

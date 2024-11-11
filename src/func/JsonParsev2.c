@@ -12,7 +12,11 @@
                                 for(int i = 0; i < DIM_DEPTH; i++)  \
                                     dim[i] = num;                   \
                             }while(0)
-
+#define ARRAY_SIZE(dim, result) do{                                     \
+                                    result = dim[0];                    \
+                                    for(int i = 1; i < DIM_DEPTH; i++)  \
+                                        result *= dim[i];               \
+                                }while(0)
 
 #define WEIGHT "weight"
 #define BIAS "bias"
@@ -26,7 +30,7 @@ typedef enum data_order{
     OVAR,
     OMAX,
 }data_order_t;
-const char *name_order[OMAX] = {"weight", "bias", "running_mean", "running_var" };
+const char *name_order[OMAX] = {"weight", "bias alpha", "running_mean", "running_var" };
 const char *name_typ[] = {
     [TERROR]="error", 
     [NET_ROOT] = "root", 
@@ -37,12 +41,19 @@ const char *name_typ[] = {
     [TLINER] = "linear",
     };
 
+const char *tabulate[] = {
+    "|       |       |       |       |", 
+    "|--------------------------------"
+    };
+
+
 static struct net Net = {
     .type = NET_ROOT,
     .child = NULL,
 };
 static uint32_t dim[DIM_DEPTH];
 
+/* Recursive calls, must use double Pointers */
 static void read_multi_dim_array(cJSON *array, void **data){
     if (array == NULL || data == NULL) {
         dbg_print("read_multi_dim_array arguments is NULL!\n");
@@ -50,8 +61,8 @@ static void read_multi_dim_array(cJSON *array, void **data){
     }
 
     if(!cJSON_IsArray(array)) {
-        (*((float *)(*data))) = array->valuedouble;
-        // dbg_print("%f ", array->valuedouble);
+        *((float *)(*data)) = array->valuedouble;
+        dbg_print("%f ", *((float *)(*data)));
         *data += sizeof(float);
         return;
     }
@@ -63,72 +74,49 @@ static void read_multi_dim_array(cJSON *array, void **data){
     }
 }
 
-const char *tabulate[] = {
-    "|                                ", 
-    "|--------------------------------"
-    };
-static int tab_cnt;
-void printf_net_data(common_t *data){
-    common_t *stage = (data?data:(common_t *)&Net);
-
-    if((void*)stage == &Net)
-        tab_cnt = 0;
-    else
-        tab_cnt+=8;
-
-    while(stage != NULL){
-        switch(stage->type){
-            case NET_ROOT:
-            case TLAYER:
-            case TSHORTCUT:
-                printf("%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], stage->name);
-                if(stage->child != NULL)
-                    printf_net_data((common_t *)stage->child);
-                break;
-            case TCONV:
-            case TBACHNORM:
-            case TLINER:
-                printf("%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], stage->name);
-                break;
-        default:break;
-        }
-        stage = (common_t *)stage->sibling;
-    }
-
-    if((void*)stage != &Net)
-        tab_cnt-=8;
-}
-
-Tstruct *node_create(Tstruct *dad, Tstruct new, int arry_size, char *name){
+static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], char *name){
     size_t malloc_size = 0;
+    uint32_t arry_size;
+    ARRAY_SIZE(dim, arry_size);
+    dbg_print("name:%s ,arry_size:%d\n", name, arry_size);
     common_t *node = NULL;
     switch(new){
         case TLAYER:
         case TSHORTCUT:
-            malloc_size = sizeof(container_t);
+            node = malloc(sizeof(container_t));
+            malloc_size = 0;
             break;
         case TCONV:
-            malloc_size = (arry_size+512) * sizeof(float) + sizeof(data_info_t);
+            node = malloc(sizeof(data_info_t));
+            malloc_size = (arry_size+dim[0]) * sizeof(float);
+            ((data_info_t *)node)->data = malloc(malloc_size);
+            ((data_info_t *)node)->len = FLOAT_BYTE;
             break;
         case TBACHNORM:
-            malloc_size = arry_size * sizeof(float)*4 + sizeof(data_info_t);
+            node = malloc(sizeof(data_info_t));
+            malloc_size = arry_size * sizeof(float) * 4;
+            ((data_info_t *)node)->data = malloc(malloc_size);
+            ((data_info_t *)node)->len = FLOAT_BYTE;
             break;
         case TLINER:
-            malloc_size = arry_size * sizeof(float)*2 + sizeof(data_info_t);
+            node = malloc(sizeof(data_info_t));
+            malloc_size = arry_size * sizeof(float) * 2;
+            ((data_info_t *)node)->data = malloc(malloc_size);
+            ((data_info_t *)node)->len = FLOAT_BYTE;
             break;
         default:printf("Tstruct error!\n");return NULL;
     }
+
+    if(!node){
+        dbg_print("node create malloc error!\n");
+        return NULL;
+    }
+    dbg_print("malloc ok. size:%ld\n", malloc_size);
+
     /* new type have parent */
     if(dad){
         /* new type is container */
         if(((common_t *)dad)->type == TLAYER || ((common_t *)dad)->type == TSHORTCUT){
-            dbg_print("container malloc.\n");
-            node = malloc(malloc_size);
-            if(!node){
-                dbg_print("node create malloc error!\n");
-                return NULL;
-            }
-            dbg_print("container malloc ok. size:%ld\n", malloc_size);
             node->parent = dad;
             node->sibling = ((common_t *)dad)->child;
             ((common_t *)dad)->child = (Tstruct *)node;
@@ -136,26 +124,12 @@ Tstruct *node_create(Tstruct *dad, Tstruct new, int arry_size, char *name){
         }
         /* new type is data */
         else {
-            dbg_print("data malloc.\n");
-            node = malloc(malloc_size);
-            if(!node){
-                dbg_print("node create malloc error!\n");
-                return NULL;
-            }
-            dbg_print("data malloc ok. size:%ld\n", malloc_size);
             node->parent = dad;
             node->type = new;
         }
     }
     /* new type don't have parent */
     else {
-        dbg_print("root child malloc. size:%ld\n", malloc_size);
-        node = malloc(malloc_size);
-        if(!node){
-            dbg_print("node create malloc error!\n");
-            return NULL;
-        }
-        dbg_print("root child malloc ok. size:%ld\n", malloc_size);
         node->type = new;
         node->parent = (Tstruct*)&Net;
         node->sibling = Net.child;
@@ -166,7 +140,7 @@ Tstruct *node_create(Tstruct *dad, Tstruct new, int arry_size, char *name){
     return (Tstruct*)node;
 }
 
-common_t *grep_obj_child(common_t *data, char *name){
+static common_t *grep_obj_child(common_t *data, char *name){
     common_t *ret = (data?(common_t *)data->child:(common_t *)Net.child);
     while(ret){
         dbg_print("%s %s result:%d\n", ret->name, name, strcmp(ret->name, name) == 0);
@@ -177,7 +151,7 @@ common_t *grep_obj_child(common_t *data, char *name){
     return NULL;
 }
 
-data_info_t *get_data_info(char *str, uint32_t arry_size){
+static data_info_t *get_data_info(char *str, uint32_t dim[DIM_DEPTH]){
     if(str == NULL)
         return NULL;
     int size = 0;
@@ -211,7 +185,7 @@ data_info_t *get_data_info(char *str, uint32_t arry_size){
                 }
             }
             /* Create missing data. */
-            current = (common_t *)node_create((Tstruct *)last_stage, order, arry_size, string_buff);
+            current = (common_t *)node_create((Tstruct *)last_stage, order, dim, string_buff);
             if(!current){
                 dbg_print("node create error!\n");
                 return NULL;
@@ -227,6 +201,7 @@ static void read_json_data_v2(cJSON *json){
     cJSON *sub_arry = json;
     INIT_DIM(dim, 1);
     int cnt = 0;
+    uint32_t arry_size = 0;
     void *data;
     Tstruct *stage;
 
@@ -237,19 +212,21 @@ static void read_json_data_v2(cJSON *json){
         sub_arry = cJSON_GetArrayItem(sub_arry, 0);
     }
 
-    uint32_t arry_size = dim[0]*dim[1]*dim[2]*dim[3];
-    data_info_t *arry_data = get_data_info(json->string, arry_size);
+    data_info_t *arry_data = get_data_info(json->string, dim);
     if(arry_data == NULL)
         return;
     memcpy(arry_data->dim, dim, sizeof(dim));
 
     data_order_t order;
     for(order = OWEIGHT; order < OMAX; order++)
-        if(strcmp(strrchr(json->string, '.')+1, name_order[order]))
+        if(strstr(name_order[order], strrchr(json->string, '.')+1) != NULL)
             break;
+    if(order >= OMAX)
+        return;
 
+    dbg_print("%d\n", order);
+    ARRAY_SIZE(dim, arry_size);
     data = arry_data->data + arry_size*order*sizeof(float);
-    data = arry_data->data;
     if(!data){
         dbg_print("arry_data->data ptr is NULL;");
         return;
@@ -283,7 +260,7 @@ static void reverse_nodes(common_t *parent)
 	}
 }
 
-void obj_type_detech_create_v2(cJSON *json) {
+static void obj_type_detech_create_v2(cJSON *json) {
     if (json == NULL) {
         return;
     }
@@ -303,6 +280,106 @@ void obj_type_detech_create_v2(cJSON *json) {
         item = item->next;
     }
     return;
+}
+
+static int tab_cnt;
+void printf_net_data(common_t *data){
+    common_t *stage = (data?data:(common_t *)&Net);
+
+    if((void*)stage == &Net)
+        tab_cnt = 0;
+    else
+        tab_cnt+=8;
+
+    while(stage != NULL){
+        switch(stage->type){
+            case NET_ROOT:
+            case TLAYER:
+            case TSHORTCUT:
+                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], (int)(8-strlen(stage->name))/2,"    ",  stage->name);
+                if(stage->child != NULL)
+                    printf_net_data((common_t *)stage->child);
+                break;
+            case TCONV:
+            case TBACHNORM:
+            case TLINER:
+                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], (int)(8-strlen(stage->name))/2,"    ",  stage->name);
+                break;
+        default:break;
+        }
+        stage = (common_t *)stage->sibling;
+    }
+
+    if((void*)stage != &Net)
+        tab_cnt-=8;
+}
+
+void printf_appoint_data(char *str){
+    if(str == NULL)
+        return;
+    int size = 0;
+    char string_buff[16],*str_ptr = str;
+    common_t *current = NULL, *last_stage = NULL;
+    dbg_print("%s\n", str);
+
+    while(*str_ptr && strchr(str_ptr, '.')){
+        memset(string_buff, 0x00, sizeof(string_buff));
+        size = strchr(str_ptr, '.') - str_ptr;
+        strncpy(string_buff, str_ptr, size);
+        current = grep_obj_child(last_stage, string_buff); 
+        if(!current){
+            return;
+        }
+        last_stage = current;
+        str_ptr = strchr(str_ptr, '.') + 1;
+    }
+    if(current){
+        printf("%s\n", str);
+        uint32_t array_size, offset = 0;
+        data_info_t *d_info = (data_info_t *)current;
+        ARRAY_SIZE(d_info->dim, array_size);
+
+        data_order_t order;
+        for(order = OWEIGHT; order < OMAX; order++)
+            if(strstr(name_order[order], strrchr(str, '.')+1) != NULL)
+                break;
+        if(order >= OMAX)
+            return;
+
+        offset = array_size * order;
+
+        switch(d_info->len){
+            case UNKNOW:
+                wprint("data byte len unknow!\n");
+            case BINARY:
+                if(offset == 0)
+                    for(uint32_t i = 0;i < array_size/64; i++)
+                        printf("%lx ", ((uint64_t *)d_info->data)[i]);
+                else
+                    for(uint32_t i = 0;i < array_size; i++)
+                        printf("%f ", ((float *)d_info->data)[i+offset/(sizeof(float)*8)]);
+                break;
+            case TWO_BYTE:
+                break;
+            case FLOAT_BYTE:
+                printf("FLOAT_BYTE\n");
+                if (d_info->data != NULL) {
+                    float *data = (float *)d_info->data;
+                    printf("d_info->data array_size:%d\n", array_size);
+                    for(uint32_t i = 0;i < array_size; i++){
+                        if(i%16 == 0)
+                            printf("\n");
+                        printf("%-6f ", data[i+offset]);
+                    }
+                }
+                else
+                    printf("d_info->data = NULL\n");
+                break;
+            default:
+                eprint("data byte len error!\n");
+                break;
+        }
+    }
 }
 
 void json_model_parse_v2(char* file_name) {
@@ -337,6 +414,7 @@ void json_model_parse_v2(char* file_name) {
     obj_type_detech_create_v2(root);
     reverse_nodes((common_t *)&Net);
     printf_net_data(NULL);
+    printf_appoint_data("layer1.1.bn2.running_mean");
 
     // 释放 cJSON 结构体并释放内存
     cJSON_Delete(root);
