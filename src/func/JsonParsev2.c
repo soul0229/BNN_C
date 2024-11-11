@@ -30,7 +30,7 @@ typedef enum data_order{
     OVAR,
     OMAX,
 }data_order_t;
-const char *name_order[OMAX] = {"weight", "bias alpha", "running_mean", "running_var" };
+const char *name_order[OMAX] = {[0]="weight", [1]="bias|alpha", [2]="running_mean", [3]="running_var" };
 const char *name_typ[] = {
     [TERROR]="error", 
     [NET_ROOT] = "root", 
@@ -51,7 +51,6 @@ static struct net Net = {
     .type = NET_ROOT,
     .child = NULL,
 };
-static uint32_t dim[DIM_DEPTH];
 
 /* Recursive calls, must use double Pointers */
 static void read_multi_dim_array(cJSON *array, void **data){
@@ -87,22 +86,19 @@ static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], 
             malloc_size = 0;
             break;
         case TCONV:
+        case TLINER:
             node = malloc(sizeof(data_info_t));
             malloc_size = (arry_size+dim[0]) * sizeof(float);
             ((data_info_t *)node)->data = malloc(malloc_size);
             ((data_info_t *)node)->len = FLOAT_BYTE;
+            memcpy(((data_info_t *)node)->dim, dim, sizeof(uint32_t)*DIM_DEPTH);
             break;
         case TBACHNORM:
             node = malloc(sizeof(data_info_t));
             malloc_size = arry_size * sizeof(float) * 4;
             ((data_info_t *)node)->data = malloc(malloc_size);
             ((data_info_t *)node)->len = FLOAT_BYTE;
-            break;
-        case TLINER:
-            node = malloc(sizeof(data_info_t));
-            malloc_size = arry_size * sizeof(float) * 2;
-            ((data_info_t *)node)->data = malloc(malloc_size);
-            ((data_info_t *)node)->len = FLOAT_BYTE;
+            memcpy(((data_info_t *)node)->dim, dim, sizeof(uint32_t)*DIM_DEPTH);
             break;
         default:printf("Tstruct error!\n");return NULL;
     }
@@ -199,6 +195,7 @@ static data_info_t *get_data_info(char *str, uint32_t dim[DIM_DEPTH]){
 
 static void read_json_data_v2(cJSON *json){
     cJSON *sub_arry = json;
+    uint32_t dim[DIM_DEPTH];
     INIT_DIM(dim, 1);
     int cnt = 0;
     uint32_t arry_size = 0;
@@ -215,7 +212,6 @@ static void read_json_data_v2(cJSON *json){
     data_info_t *arry_data = get_data_info(json->string, dim);
     if(arry_data == NULL)
         return;
-    memcpy(arry_data->dim, dim, sizeof(dim));
 
     data_order_t order;
     for(order = OWEIGHT; order < OMAX; order++)
@@ -225,13 +221,13 @@ static void read_json_data_v2(cJSON *json){
         return;
 
     dbg_print("%d\n", order);
-    ARRAY_SIZE(dim, arry_size);
+    ARRAY_SIZE(arry_data->dim, arry_size);
     data = arry_data->data + arry_size*order*sizeof(float);
     if(!data){
         dbg_print("arry_data->data ptr is NULL;");
         return;
     }
-    dbg_print("dim[%d][%d][%d][%d]\t\t%s\n", dim[0], dim[1], dim[2], dim[3], json->string);
+    dbg_print("dim[%d][%d][%d][%d]\t\t%s\n", arry_data->dim[0], arry_data->dim[1], arry_data->dim[2], arry_data->dim[3], json->string);
     read_multi_dim_array(json, &data);
 }
 
@@ -296,14 +292,14 @@ void printf_net_data(common_t *data){
             case NET_ROOT:
             case TLAYER:
             case TSHORTCUT:
-                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], (int)(8-strlen(stage->name))/2,"    ",  stage->name);
+                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], (int)(8-strlen(stage->name))/2, "    ",  stage->name);
                 if(stage->child != NULL)
                     printf_net_data((common_t *)stage->child);
                 break;
             case TCONV:
             case TBACHNORM:
             case TLINER:
-                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], (int)(8-strlen(stage->name))/2,"    ",  stage->name);
+                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], (int)(8-strlen(stage->name))/2, "    ",  stage->name);
                 break;
         default:break;
         }
@@ -312,6 +308,49 @@ void printf_net_data(common_t *data){
 
     if((void*)stage != &Net)
         tab_cnt-=8;
+}
+
+void binary_net_data(common_t *data){
+    common_t *stage = (data?data:(common_t *)&Net);
+    while(stage != NULL){
+        switch(stage->type){
+            case NET_ROOT:
+            case TLAYER:
+            case TSHORTCUT:
+                if(stage->child != NULL)
+                    binary_net_data((common_t *)stage->child);
+                break;
+            case TCONV:
+                data_info_t *d_info = NULL;
+                d_info = (data_info_t*)stage;
+                float *data = d_info->data;
+                if(d_info->len == FLOAT_BYTE && ((common_t *)d_info->parent)->type != NET_ROOT){
+                    uint32_t array_size;
+                    ARRAY_SIZE(d_info->dim, array_size);
+                    uint8_t *binary = malloc((array_size/32 + d_info->dim[0]) * sizeof(float));
+                    for(uint16_t dim0 = 0; dim0 < d_info->dim[0]; dim0++){
+                        for(uint16_t dim1 = 0; dim1 < d_info->dim[1]; dim1++){
+                            for(uint16_t dim2 = 0; dim2 < d_info->dim[2]; dim2++){
+                                for(uint16_t dim3 = 0; dim3 < d_info->dim[3]; dim3++){
+                                    binary[dim0*(d_info->dim[1]/8)*d_info->dim[2]*d_info->dim[3]+dim2*d_info->dim[3]*(d_info->dim[1]/8)+dim3*(d_info->dim[1]/8)+(dim1/8)] |= \
+                                    ((data[dim0*d_info->dim[1]*d_info->dim[2]*d_info->dim[3]+dim1*d_info->dim[2]*d_info->dim[3]+dim2*d_info->dim[3]+dim3]>0)?(0x80>>(dim1%8)):((uint8_t)(0x00)));
+                                }
+                            }
+                        }
+                    }
+                    memcpy(((void*)binary)+array_size*sizeof(float)/32,((void*)data)+array_size*sizeof(float), d_info->dim[0]*sizeof(float));
+                    free(data);
+                    d_info->data = binary;
+                    d_info->len = BINARY;
+                }
+                break;
+            case TBACHNORM:
+            case TLINER:
+                break;
+        default:break;
+        }
+        stage = (common_t *)stage->sibling;
+    }
 }
 
 void printf_appoint_data(char *str){
@@ -352,28 +391,38 @@ void printf_appoint_data(char *str){
             case UNKNOW:
                 wprint("data byte len unknow!\n");
             case BINARY:
-                if(offset == 0)
-                    for(uint32_t i = 0;i < array_size/64; i++)
-                        printf("%lx ", ((uint64_t *)d_info->data)[i]);
-                else
-                    for(uint32_t i = 0;i < array_size; i++)
+                if(offset == 0){
+                    printf("binary\n");
+                    for(uint32_t i = 0;i < array_size/8; i++){
+                        printf("%02x ", ((uint8_t *)d_info->data)[i]);
+                        if(i%(d_info->dim[1]/8) == (d_info->dim[1]/8)-1)
+                            printf("\n");
+                    }
+                }
+                else{
+                    printf("in binary\n");
+                    for(uint32_t i = 0;i < array_size; i++){
                         printf("%f ", ((float *)d_info->data)[i+offset/(sizeof(float)*8)]);
+                        if(i%16 == 15)
+                                printf("\n");
+                    }
+                }
                 break;
             case TWO_BYTE:
                 break;
             case FLOAT_BYTE:
-                printf("FLOAT_BYTE\n");
+                dbg_print("FLOAT_BYTE\n");
                 if (d_info->data != NULL) {
                     float *data = (float *)d_info->data;
                     printf("d_info->data array_size:%d\n", array_size);
-                    for(uint32_t i = 0;i < array_size; i++){
-                        if(i%16 == 0)
-                            printf("\n");
+                    for(uint32_t i = 0;i < 64*9; i++){
                         printf("%-6f ", data[i+offset]);
+                        if(i%9 == 8)
+                            printf("\n");
                     }
                 }
                 else
-                    printf("d_info->data = NULL\n");
+                    eprint("d_info->data = NULL\n");
                 break;
             default:
                 eprint("data byte len error!\n");
@@ -414,11 +463,12 @@ void json_model_parse_v2(char* file_name) {
     obj_type_detech_create_v2(root);
     reverse_nodes((common_t *)&Net);
     printf_net_data(NULL);
-    printf_appoint_data("layer1.1.bn2.running_mean");
+    binary_net_data(NULL);
+    printf_appoint_data("layer1.0.conv1.weight");
 
     // 释放 cJSON 结构体并释放内存
     cJSON_Delete(root);
     free(json_buffer);
-
+// 55 fe 12 43 04 55 5b 15 
     return;
 }
