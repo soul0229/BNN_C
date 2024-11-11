@@ -37,7 +37,7 @@ struct data_info{
     char name[16];
     Data_Len len;
     uint32_t dim[DIM_DEPTH];
-    void *data;
+    char data[0];
 };
 typedef struct data_info data_info_t;
 
