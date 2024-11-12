@@ -57,6 +57,7 @@ struct net{
     char name[32]; 
     void (*process)(struct data_info*);
 };
+typedef struct net net_t;
 
 struct common{
     Tstruct type;

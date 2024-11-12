@@ -4,9 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define align16(x)    (((x)+(16-1))-(((x)+(16-1))%16))
+#define align16(x)              (((x)+(16-1))-(((x)+(16-1))%16))
+#define alignidx(size, idx)     (((size)+(idx-1))-(((size)+(idx-1))%idx))
 #define PARTSIZE(type,mem) ((unsigned long)(&(((type *)0)->mem)))
 
+#define RGB_PRINT
 #if defined(RGB_PRINT)
 #define clrprint(clr,str,...) printf("\033[%dm" str "\033[0m",clr,##__VA_ARGS__)
 #else

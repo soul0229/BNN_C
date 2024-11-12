@@ -310,6 +310,122 @@ void printf_net_data(common_t *data){
         tab_cnt-=8;
 }
 
+int get_child_size(common_t *data){
+    if(data == NULL)
+        return 0;
+    int size_cnt = 0;
+    while(data){
+        switch(data->type){
+            case NET_ROOT:
+                size_cnt += alignidx(sizeof(struct net), 4);
+                size_cnt += alignidx(get_child_size((common_t *)data->child), 4);
+                break;
+            case TLAYER:
+            case TSHORTCUT:
+                size_cnt += alignidx(sizeof(container_t), 4);
+                size_cnt += alignidx(get_child_size((common_t *)data->child), 4);
+                break;
+            case TCONV:
+            case TBACHNORM:
+            case TLINER:
+                size_cnt += alignidx(sizeof(data_info_t), 4);
+                break;
+            default:break;
+        }
+        data = (common_t *)data->sibling;
+    }
+    return size_cnt;
+}
+
+void net_data_storage(common_t *data, FILE *file, int node_offset, int *data_offset){
+    common_t *stage = (data?data:(common_t *)&Net);
+    container_t *cont = malloc(sizeof(container_t));
+    data_info_t *d_info = malloc(sizeof(data_info_t));
+    int  data_size = 0, sibling_offset = 0;
+    
+    while(stage != NULL){
+        data_size = 0; sibling_offset = 0;
+        if(stage->type >= TCONV)
+            ARRAY_SIZE(((data_info_t*)stage)->dim, data_size);
+        else sibling_offset = get_child_size((common_t *)stage->child);
+        clrprint(32,"node_offset:%d sibling_offset:%d\n", node_offset, sibling_offset);
+        switch(stage->type){
+            case NET_ROOT:
+                goto free_mem;
+            case TLAYER:
+            case TSHORTCUT:
+                fseek(file, node_offset, SEEK_SET);
+                memset(cont, 0x00, sizeof(container_t));
+                memcpy(cont, stage, sizeof(container_t));
+                dbg_print("node_offset:%d %s %s size:%ld\n", node_offset, name_typ[cont->type], cont->name, sizeof(container_t));
+                cont->parent = 0;
+                node_offset += alignidx(sizeof(container_t), 4);
+                if(cont->child)
+                    cont->child = (Tstruct *)((int64_t)node_offset);
+                if(cont->sibling)
+                    cont->sibling = (Tstruct *)((int64_t)node_offset + sibling_offset);
+                fwrite(cont, alignidx(sizeof(container_t), 4), 1, file);
+                if(stage->child)
+                    net_data_storage((common_t *)stage->child, file, node_offset, data_offset);
+                node_offset += sibling_offset;
+                break;
+            case TBACHNORM:
+                data_size *= 3;
+            case TCONV:
+                if(((data_info_t*)stage)->len == BINARY)
+                    data_size/=32;
+            case TLINER:
+                fseek(file, node_offset, SEEK_SET);
+                memset(d_info, 0x00, sizeof(data_info_t));
+                memcpy(d_info, stage, sizeof(data_info_t));
+                dbg_print("node_offset:%d data_offset:0x%x %s %s size:%ld\n", node_offset, *data_offset, name_typ[d_info->type], d_info->name, sizeof(data_info_t));
+                d_info->data = (void*)((int64_t)*data_offset);
+                d_info->parent = 0;
+                fwrite(d_info, alignidx(sizeof(data_info_t), 4), 1, file);
+                node_offset += alignidx(sizeof(data_info_t), 4);
+                fseek(file, *data_offset, SEEK_SET);
+                data_size += d_info->dim[0];
+                dbg_print("data size:%d\n", data_size);
+                fwrite(((data_info_t*)stage)->data, data_size*sizeof(float), 1, file);
+                *data_offset += data_size*sizeof(float);
+                break;
+        default:break;
+        }
+        stage = (common_t *)stage->sibling;
+    }
+free_mem:
+    free(cont);
+    free(d_info);
+}
+
+void net_storage(char *file_name){
+    int node_offset = sizeof(header_t), data_offset = get_child_size((common_t *)&Net)+alignidx(sizeof(header_t), 4);
+    header_t head = {
+        .magic = BNN_MAGIC,
+        .node_offset = node_offset,
+        .data_offset = data_offset
+    };
+    dbg_print("data_offset:%ld", data_offset);
+    FILE *file = fopen(file_name, "w");
+    if (file == NULL) {
+        eprint("打开文件失败!");
+        return;
+    }
+    fseek(file, 0, SEEK_SET);
+    fwrite(&head, alignidx(sizeof(header_t), 4), 1, file);
+
+    net_t *net_d = malloc(sizeof(net_t));
+    memcpy(net_d, &Net, sizeof(net_t));
+    fseek(file, node_offset, SEEK_SET);
+    memcpy(net_d->name, file_name, strlen(file_name));
+    node_offset += alignidx(sizeof(net_t), 4);
+    net_d->child = (Tstruct*)((int64_t)node_offset);
+    fwrite(net_d, alignidx(sizeof(net_t), 4), 1, file);
+    net_data_storage((common_t *)Net.child, file, node_offset, &data_offset);
+    free(net_d);
+    fclose(file);
+}
+
 void binary_net_data(common_t *data){
     common_t *stage = (data?data:(common_t *)&Net);
     while(stage != NULL){
@@ -367,12 +483,12 @@ void printf_appoint_data(char *str){
         strncpy(string_buff, str_ptr, size);
         current = grep_obj_child(last_stage, string_buff); 
         if(!current){
-            return;
+            break;
         }
         last_stage = current;
         str_ptr = strchr(str_ptr, '.') + 1;
     }
-    if(current){
+    if(current && current->type >= TCONV){
         printf("%s\n", str);
         uint32_t array_size, offset = 0;
         data_info_t *d_info = (data_info_t *)current;
@@ -392,11 +508,12 @@ void printf_appoint_data(char *str){
                 wprint("data byte len unknow!\n");
             case BINARY:
                 if(offset == 0){
+                    int cnt = 0;
                     printf("binary\n");
                     for(uint32_t i = 0;i < array_size/8; i++){
                         printf("%02x ", ((uint8_t *)d_info->data)[i]);
                         if(i%(d_info->dim[1]/8) == (d_info->dim[1]/8)-1)
-                            printf("\n");
+                            printf(" %d\n",cnt++);
                     }
                 }
                 else{
@@ -415,7 +532,7 @@ void printf_appoint_data(char *str){
                 if (d_info->data != NULL) {
                     float *data = (float *)d_info->data;
                     printf("d_info->data array_size:%d\n", array_size);
-                    for(uint32_t i = 0;i < 64*9; i++){
+                    for(uint32_t i = 0;i < array_size; i++){
                         printf("%-6f ", data[i+offset]);
                         if(i%9 == 8)
                             printf("\n");
@@ -428,6 +545,9 @@ void printf_appoint_data(char *str){
                 eprint("data byte len error!\n");
                 break;
         }
+    }
+    else if(current){
+        printf("child size:%d\n",get_child_size((common_t*)current->child));
     }
 }
 
@@ -464,11 +584,12 @@ void json_model_parse_v2(char* file_name) {
     reverse_nodes((common_t *)&Net);
     printf_net_data(NULL);
     binary_net_data(NULL);
-    printf_appoint_data("layer1.0.conv1.weight");
+    net_storage("resnet18.ml");
+    // printf_appoint_data("layer1.");
 
     // 释放 cJSON 结构体并释放内存
     cJSON_Delete(root);
     free(json_buffer);
-// 55 fe 12 43 04 55 5b 15 
+
     return;
 }
