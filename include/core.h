@@ -33,7 +33,8 @@ typedef enum Type_Struct{
 struct data_info{
     Tstruct type;
     Tstruct *parent;
-    Tstruct *reserve[2];
+    Tstruct *sibling;
+    Tstruct *reserve;
     char name[16];
     Data_Len len;
     uint32_t dim[DIM_DEPTH];
@@ -52,7 +53,8 @@ typedef struct container container_t;
 
 struct net{
     Tstruct type;
-    Tstruct *reserve[2];
+    Tstruct *reserve;
+    Tstruct *sibling;
     Tstruct *child;
     char name[32]; 
     void (*process)(struct data_info*);

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "core.h"
 #include "utils.h"
 #include <getopt.h>
 
@@ -8,6 +9,7 @@ typedef enum command{
     RUN,
     PARSE,
     TEST,
+    PRINT,
     CMD_NUM,
 }command_t;
 
@@ -16,6 +18,7 @@ void print_help() {
     printf("Options:\n");
     printf("  -R, --run             Run model inference\n");
     printf("  -P, --parse           Parse json file in list table\n");
+    printf("  -p, --print           Parse json file in list table\n");
     printf("  -T, --test            Internal test use\n");
     printf("  -h, --help            Show help information\n");
     printf("  -o, --output <file>   Output file name\n");
@@ -29,11 +32,13 @@ int main(int argc, char *argv[]) {
     char *file = NULL, *model = NULL, *output = NULL;
     int number = 0;
     command_t cmd;
+    extern net_t *net_start;
 
     // 定义长选项
     static struct option long_options[] = {
         {"run", no_argument, 0, 'R'},
         {"parse", no_argument, 0, 'P'},
+        {"print", no_argument, 0, 'p'},
         {"test", no_argument, 0, 'T'},
         {"model", required_argument, 0, 'm'},
         {"output", required_argument, 0, 'o'},
@@ -44,13 +49,15 @@ int main(int argc, char *argv[]) {
     };
 
     // 解析命令行参数
-    while ((opt = getopt_long(argc, argv, "RPTo:f:m:n:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "RPTpo:f:m:n:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'R':cmd = RUN;
                     break;
             case 'P':cmd = PARSE;
                     break;
             case 'T':cmd = TEST;
+                    break;
+            case 'p':cmd = PRINT;
                     break;
             case 'o':
                 output = optarg;
@@ -84,6 +91,10 @@ int main(int argc, char *argv[]) {
             // NetStorage(json_model_parse(file), NULL, NULL, NULL, output);
             break;
         case TEST:break;
+        case PRINT:
+            load_ml_net(file);
+            printf_net_structure((common_t*)net_start);
+            break;
         default:
         print_help();
             return -1;

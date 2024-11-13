@@ -3,6 +3,7 @@
 #include "stdio.h"
 #include "conv.h"
 #include <stdint.h>
+#include <core.h>
 
 
 
@@ -20,5 +21,7 @@ Activate_TypeDef *batchnorm_pcs(Activate_TypeDef *activate, BatchNorm *bn);
 
 
 void json_model_parse_v2(char* file_name);
+void load_ml_net(char *file_name);
+void printf_net_structure(common_t *data);
 
 #endif

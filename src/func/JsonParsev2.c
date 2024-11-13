@@ -3,6 +3,7 @@
 #include <stdlib.h> 
 #include <cjson/cJSON.h> 
 #include <string.h>
+#include <threads.h>
 #include "common.h"
 #include "conv.h"
 #include "core.h"
@@ -51,6 +52,7 @@ static struct net Net = {
     .type = NET_ROOT,
     .child = NULL,
 };
+net_t *net_start;
 
 /* Recursive calls, must use double Pointers */
 static void read_multi_dim_array(cJSON *array, void **data){
@@ -111,18 +113,10 @@ static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], 
 
     /* new type have parent */
     if(dad){
-        /* new type is container */
-        if(((common_t *)dad)->type == TLAYER || ((common_t *)dad)->type == TSHORTCUT){
-            node->parent = dad;
-            node->sibling = ((common_t *)dad)->child;
-            ((common_t *)dad)->child = (Tstruct *)node;
-            node->type = new;
-        }
-        /* new type is data */
-        else {
-            node->parent = dad;
-            node->type = new;
-        }
+        node->parent = dad;
+        node->sibling = ((common_t *)dad)->child;
+        ((common_t *)dad)->child = (Tstruct *)node;
+        node->type = new;
     }
     /* new type don't have parent */
     else {
@@ -279,10 +273,10 @@ static void obj_type_detech_create_v2(cJSON *json) {
 }
 
 static int tab_cnt;
-void printf_net_data(common_t *data){
+void printf_net_structure(common_t *data){
     common_t *stage = (data?data:(common_t *)&Net);
 
-    if((void*)stage == &Net)
+    if((void*)stage == &Net || (void*)stage == net_start)
         tab_cnt = 0;
     else
         tab_cnt+=8;
@@ -292,22 +286,113 @@ void printf_net_data(common_t *data){
             case NET_ROOT:
             case TLAYER:
             case TSHORTCUT:
-                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], (int)(8-strlen(stage->name))/2, "    ",  stage->name);
+                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], ((int)(8-strlen(stage->name))/2 < 0)?0:(int)(8-strlen(stage->name))/2, "    ",  stage->name);
                 if(stage->child != NULL)
-                    printf_net_data((common_t *)stage->child);
+                    printf_net_structure((common_t *)stage->child);
                 break;
             case TCONV:
             case TBACHNORM:
             case TLINER:
-                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], (int)(8-strlen(stage->name))/2, "    ",  stage->name);
+                printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], ((int)(8-strlen(stage->name))/2 < 0)?0:(int)(8-strlen(stage->name))/2, "    ",  stage->name);
                 break;
         default:break;
         }
         stage = (common_t *)stage->sibling;
     }
 
-    if((void*)stage != &Net)
+    if((void*)stage != &Net || (void*)stage == net_start)
         tab_cnt-=8;
+}
+
+void recursive_load_net(FILE *file, Tstruct *child, Tstruct* parent){
+    data_info_t comn;
+    common_t *current;
+    int  data_size = 0;
+    uint32_t dim[DIM_DEPTH];
+    void *data = NULL;
+    while(child){
+        fseek(file, (int64_t)child, SEEK_SET);
+        fread(&comn, sizeof(data_info_t), 1, file);
+        data = NULL;
+        current = NULL;
+        memset(dim, 0x00, sizeof(dim));
+        if(comn.type >= TCONV)
+            ARRAY_SIZE(comn.dim, data_size);
+        switch(comn.type){
+            case TLAYER:
+            case TSHORTCUT:
+                current = (common_t*)node_create((Tstruct*)parent, comn.type, comn.dim, comn.name);
+                if(!current){
+                    printf("node_create error!\n");
+                    return;
+                }
+                if(comn.reserve != NULL){
+                    dbg_print("recursive_load_net\n");
+                    recursive_load_net(file, comn.reserve, (Tstruct*)current);
+                }
+                break;
+            case TBACHNORM:
+                data_size *= 3;
+            case TCONV:
+                if(comn.len == BINARY)
+                    data_size/=32;
+            case TLINER:
+                current = (common_t*)node_create((Tstruct*)parent, comn.type, comn.dim, comn.name);
+                if(!current){
+                    printf("node_create error!\n");
+                    return;
+                }
+                data = ((data_info_t*)current)->data;
+                data_size += comn.dim[0];   
+                // fseek(file, (long)((data_info_t*)*net)->data, SEEK_SET);
+                // fread(data, data_size*sizeof(float), 1, file);
+                ((data_info_t*)current)->data = data;
+                break;
+            default:
+                printf("data type error\n");
+                break;
+        }
+        child = comn.sibling;
+    }
+}
+
+void load_ml_net(char *file_name){
+    FILE *file = fopen(file_name, "r");
+    if (file == NULL) {
+        eprint("打开文件失败!");
+        return;
+    }
+    dbg_print("open file %s sucess!\n", file_name);
+    header_t head;
+    fseek(file, 0, SEEK_SET);
+    fread(&head, sizeof(header_t), 1, file);
+    if(strcmp(head.magic, BNN_MAGIC)){
+        printf("file %s is not a binary neural network", file_name);
+        fclose(file);
+        return;
+    }
+    dbg_print("file %s header magic correct!\n", file_name);
+    net_t **net = &net_start;
+    while(*net && (*net)->sibling){
+        net = (net_t **)&(*net)->sibling;
+        printf("next sibling!\n");
+    }
+    *net = malloc(sizeof(net_t));
+     if (*net == NULL) {
+        // 检查 malloc 是否成功
+        printf("Memory allocation failed\n");
+        return;
+    }
+    fseek(file, head.node_offset, SEEK_SET);
+    fread(*net, sizeof(net_t), 1, file);
+    dbg_print("(*net)->name:%s\n", net_start->name);
+    Tstruct *child = (*net)->child;
+    (*net)->child = NULL;
+    if(child)
+        recursive_load_net(file, child, (Tstruct*)(*net));
+
+    fclose(file);
+    reverse_nodes((common_t *)net_start);
 }
 
 int get_child_size(common_t *data){
@@ -348,7 +433,7 @@ void net_data_storage(common_t *data, FILE *file, int node_offset, int *data_off
         if(stage->type >= TCONV)
             ARRAY_SIZE(((data_info_t*)stage)->dim, data_size);
         else sibling_offset = get_child_size((common_t *)stage->child);
-        clrprint(32,"node_offset:%d sibling_offset:%d\n", node_offset, sibling_offset);
+        // clrprint(32,"node_offset:%d sibling_offset:%d\n", node_offset, sibling_offset);
         switch(stage->type){
             case NET_ROOT:
                 goto free_mem;
@@ -379,10 +464,13 @@ void net_data_storage(common_t *data, FILE *file, int node_offset, int *data_off
                 memset(d_info, 0x00, sizeof(data_info_t));
                 memcpy(d_info, stage, sizeof(data_info_t));
                 dbg_print("node_offset:%d data_offset:0x%x %s %s size:%ld\n", node_offset, *data_offset, name_typ[d_info->type], d_info->name, sizeof(data_info_t));
-                d_info->data = (void*)((int64_t)*data_offset);
-                d_info->parent = 0;
-                fwrite(d_info, alignidx(sizeof(data_info_t), 4), 1, file);
                 node_offset += alignidx(sizeof(data_info_t), 4);
+                d_info->parent = 0;
+                if(d_info->sibling)
+                    d_info->sibling = (Tstruct *)((int64_t)node_offset + sibling_offset);
+                d_info->data = (void*)((int64_t)*data_offset);
+                fwrite(d_info, alignidx(sizeof(data_info_t), 4), 1, file);
+
                 fseek(file, *data_offset, SEEK_SET);
                 data_size += d_info->dim[0];
                 dbg_print("data size:%d\n", data_size);
@@ -421,13 +509,16 @@ void net_storage(char *file_name){
     node_offset += alignidx(sizeof(net_t), 4);
     net_d->child = (Tstruct*)((int64_t)node_offset);
     fwrite(net_d, alignidx(sizeof(net_t), 4), 1, file);
+
     net_data_storage((common_t *)Net.child, file, node_offset, &data_offset);
+
     free(net_d);
     fclose(file);
 }
 
 void binary_net_data(common_t *data){
     common_t *stage = (data?data:(common_t *)&Net);
+    data_info_t *d_info = NULL;
     while(stage != NULL){
         switch(stage->type){
             case NET_ROOT:
@@ -437,7 +528,6 @@ void binary_net_data(common_t *data){
                     binary_net_data((common_t *)stage->child);
                 break;
             case TCONV:
-                data_info_t *d_info = NULL;
                 d_info = (data_info_t*)stage;
                 float *data = d_info->data;
                 if(d_info->len == FLOAT_BYTE && ((common_t *)d_info->parent)->type != NET_ROOT){
@@ -582,7 +672,7 @@ void json_model_parse_v2(char* file_name) {
 
     obj_type_detech_create_v2(root);
     reverse_nodes((common_t *)&Net);
-    printf_net_data(NULL);
+    printf_net_structure(NULL);
     binary_net_data(NULL);
     net_storage("resnet18.ml");
     // printf_appoint_data("layer1.");
