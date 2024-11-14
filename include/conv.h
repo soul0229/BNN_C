@@ -46,38 +46,38 @@ struct net_list{
 };
 typedef struct net_list Net_List;
 
-struct BatchNorm2d{
-    Data_Type type;
-    void *last_stage;
-    uint32_t data_site;
-    uint16_t major;
-    uint16_t size;
-    void* data[BN_NUM];
-    Net_List *list;
-};
-typedef struct BatchNorm2d BatchNorm;
+// struct BatchNorm2d{
+//     Data_Type type;
+//     void *last_stage;
+//     uint32_t data_site;
+//     uint16_t major;
+//     uint16_t size;
+//     void* data[BN_NUM];
+//     Net_List *list;
+// };
+// typedef struct BatchNorm2d BatchNorm;
 
-struct linear_float{
-    Data_Type type;
-    void *last_stage;
-    uint32_t data_site;
-    uint16_t major;
-    uint16_t size[2];
-    void* weight;
-    void* bias;
-    Net_List *list;
-};
-typedef struct linear_float Linear;
+// struct linear_float{
+//     Data_Type type;
+//     void *last_stage;
+//     uint32_t data_site;
+//     uint16_t major;
+//     uint16_t size[2];
+//     void* weight;
+//     void* bias;
+//     Net_List *list;
+// };
+// typedef struct linear_float Linear;
 
-struct layer{
-    Data_Type type;
-    void *last_stage;
-    uint16_t major;
-    uint16_t minor;
-    void *data;
-    Net_List *list; 
-};
-typedef struct layer Layer;
+// struct layer{
+//     Data_Type type;
+//     void *last_stage;
+//     uint16_t major;
+//     uint16_t minor;
+//     void *data;
+//     Net_List *list; 
+// };
+// typedef struct layer Layer;
 
 struct conv_kernel{
     Data_Type type;

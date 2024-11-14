@@ -8,6 +8,7 @@ typedef enum command{
     DEFAULT=0,
     RUN,
     PARSE,
+    LOAD,
     TEST,
     PRINT,
     CMD_NUM,
@@ -18,13 +19,14 @@ void print_help() {
     printf("Options:\n");
     printf("  -R, --run             Run model inference\n");
     printf("  -P, --parse           Parse json file in list table\n");
+    printf("  -L, --load            Load .ml file in list table\n");
     printf("  -p, --print           Parse json file in list table\n");
     printf("  -T, --test            Internal test use\n");
     printf("  -h, --help            Show help information\n");
     printf("  -o, --output <file>   Output file name\n");
     printf("  -m, --model <model>   The model to run\n");
     printf("  -f, --file <file>     Specify the input file\n");
-    printf("  -n, --name <net layer name>    Specify a name\n");
+    printf("  -n, --name <string>   Specify a name\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -38,6 +40,7 @@ int main(int argc, char *argv[]) {
     static struct option long_options[] = {
         {"run", no_argument, 0, 'R'},
         {"parse", no_argument, 0, 'P'},
+        {"load", no_argument, 0, 'L'},
         {"print", no_argument, 0, 'p'},
         {"test", no_argument, 0, 'T'},
         {"model", required_argument, 0, 'm'},
@@ -49,13 +52,15 @@ int main(int argc, char *argv[]) {
     };
 
     // 解析命令行参数
-    while ((opt = getopt_long(argc, argv, "RPTpo:f:m:n:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "RPTLpo:f:m:n:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'R':cmd = RUN;
                     break;
             case 'P':cmd = PARSE;
                     break;
             case 'T':cmd = TEST;
+                    break;
+            case 'L':cmd = LOAD;
                     break;
             case 'p':cmd = PRINT;
                     break;
@@ -93,11 +98,17 @@ int main(int argc, char *argv[]) {
             json_model_parse_v2(file);
             // NetStorage(json_model_parse(file), NULL, NULL, NULL, output);
             break;
-        case TEST:break;
+        case TEST:
+            break;
         case PRINT:
+            break;
+        case LOAD:
             load_ml_net(file);
             printf_net_structure((common_t*)net_start);
-            printf_appoint_data(name);
+            printf_appoint_data(name, (common_t*)net_start);
+            free_net((common_t**)&net_start);
+            printf("ok\n");
+            printf_net_structure((common_t*)net_start);
             break;
         default:
         print_help();

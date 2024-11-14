@@ -130,7 +130,7 @@ static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], 
 }
 
 static common_t *grep_obj_child(common_t *data, char *name){
-    common_t *ret = data?(common_t *)data->child:((common_t *)Net.child?(common_t *)Net.child:(common_t *)((common_t *)net_start)->child);
+    common_t *ret = data?(common_t *)data->child:(common_t *)Net.child;
     while(ret){
         dbg_print("%s %s result:%d\n", ret->name, name, strcmp(ret->name, name) == 0);
         if(strcmp(ret->name, name) == 0)
@@ -152,7 +152,7 @@ static data_info_t *get_data_info(char *str, uint32_t dim[DIM_DEPTH]){
         memset(string_buff, 0x00, sizeof(string_buff));
         size = strchr(str_ptr, '.') - str_ptr;
         strncpy(string_buff, str_ptr, size);
-        current = grep_obj_child(last_stage, string_buff); 
+        current = grep_obj_child(last_stage, string_buff);
         if(!current){
             Tstruct order;
             /* Determine the missing data type. */
@@ -274,6 +274,8 @@ static void obj_type_detech_create_v2(cJSON *json) {
 static int tab_cnt;
 void printf_net_structure(common_t *data){
     common_t *stage = (data?data:(common_t *)&Net);
+    if(stage->child == NULL && stage->sibling == NULL)
+        return;
 
     if((void*)stage == &Net || (void*)stage == net_start)
         tab_cnt = 0;
@@ -367,7 +369,7 @@ void load_ml_net(char *file_name){
     fseek(file, 0, SEEK_SET);
     fread(&head, sizeof(header_t), 1, file);
     if(strcmp(head.magic, BNN_MAGIC)){
-        printf("file %s is not a binary neural network", file_name);
+        printf("file %s is not a binary neural network\n", file_name);
         fclose(file);
         return;
     }
@@ -559,12 +561,12 @@ void binary_net_data(common_t *data){
     }
 }
 
-void printf_appoint_data(char *str){
+void printf_appoint_data(char *str, common_t *data){
     if(str == NULL)
         return;
     int size = 0;
     char string_buff[16],*str_ptr = str;
-    common_t *current = NULL, *last_stage = NULL;
+    common_t *current = NULL, *last_stage = data;
     dbg_print("%s\n", str);
 
     while(*str_ptr && strchr(str_ptr, '.')){
@@ -679,11 +681,45 @@ void json_model_parse_v2(char* file_name) {
     printf_net_structure(NULL);
     binary_net_data(NULL);
     net_storage("resnet18.ml");
-    // printf_appoint_data("layer1.");
 
     // 释放 cJSON 结构体并释放内存
     cJSON_Delete(root);
     free(json_buffer);
 
     return;
+}
+
+void free_net(common_t **net){
+    common_t *parent = (common_t *)(*net)->parent;
+    common_t *sibling = *net;
+    while(sibling){
+        switch(sibling->type){
+            case NET_ROOT:
+                if((common_t *)sibling->child)
+                    free_net((common_t **)&sibling->child);
+                *net = (common_t *)sibling->sibling;
+                dbg_print("%s\n", sibling->name);
+                free(sibling);
+                break;
+            case TLAYER:
+            case TSHORTCUT:
+                if((common_t *)sibling->child){
+                    free_net((common_t **)&sibling->child);
+                    ((common_t *)sibling->parent)->child = sibling->sibling;
+                }
+                dbg_print("%s\n", sibling->name);
+                free(sibling);
+                break;
+            case TCONV:
+            case TBACHNORM:
+            case TLINER:
+                dbg_print("%s\n", sibling->name);
+                ((common_t *)sibling->parent)->child = sibling->sibling;
+                free(((data_info_t*)sibling)->data);
+                free(sibling);
+                break;
+            default:break;
+        }
+        sibling = parent?(common_t *)parent->child:NULL;
+    }
 }
