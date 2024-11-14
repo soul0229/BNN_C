@@ -75,9 +75,9 @@ static void read_multi_dim_array(cJSON *array, void **data){
     }
 }
 
-static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], char *name){
+static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], char *name, Data_Len len){
     size_t malloc_size = 0;
-    uint32_t arry_size;
+    size_t arry_size;
     ARRAY_SIZE(dim, arry_size);
     dbg_print("name:%s ,arry_size:%d\n", name, arry_size);
     common_t *node = NULL;
@@ -87,19 +87,18 @@ static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], 
             node = malloc(sizeof(container_t));
             malloc_size = 0;
             break;
+        case TBACHNORM:
+            malloc_size = arry_size * 2;
         case TCONV:
         case TLINER:
+            malloc_size += arry_size;
+            if(len == BINARY)
+                malloc_size = arry_size/32;
+            dbg_print("malloc_size:%ld\n", malloc_size+dim[0]);
             node = malloc(sizeof(data_info_t));
-            malloc_size = (arry_size+dim[0]) * sizeof(float);
+            malloc_size = (malloc_size+dim[0]) * sizeof(float);
             ((data_info_t *)node)->data = malloc(malloc_size);
-            ((data_info_t *)node)->len = FLOAT_BYTE;
-            memcpy(((data_info_t *)node)->dim, dim, sizeof(uint32_t)*DIM_DEPTH);
-            break;
-        case TBACHNORM:
-            node = malloc(sizeof(data_info_t));
-            malloc_size = arry_size * sizeof(float) * 4;
-            ((data_info_t *)node)->data = malloc(malloc_size);
-            ((data_info_t *)node)->len = FLOAT_BYTE;
+            ((data_info_t *)node)->len = len?len:FLOAT_BYTE;
             memcpy(((data_info_t *)node)->dim, dim, sizeof(uint32_t)*DIM_DEPTH);
             break;
         default:printf("Tstruct error!\n");return NULL;
@@ -131,7 +130,7 @@ static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], 
 }
 
 static common_t *grep_obj_child(common_t *data, char *name){
-    common_t *ret = (data?(common_t *)data->child:(common_t *)Net.child);
+    common_t *ret = data?(common_t *)data->child:((common_t *)Net.child?(common_t *)Net.child:(common_t *)((common_t *)net_start)->child);
     while(ret){
         dbg_print("%s %s result:%d\n", ret->name, name, strcmp(ret->name, name) == 0);
         if(strcmp(ret->name, name) == 0)
@@ -175,7 +174,7 @@ static data_info_t *get_data_info(char *str, uint32_t dim[DIM_DEPTH]){
                 }
             }
             /* Create missing data. */
-            current = (common_t *)node_create((Tstruct *)last_stage, order, dim, string_buff);
+            current = (common_t *)node_create((Tstruct *)last_stage, order, dim, string_buff,0);
             if(!current){
                 dbg_print("node create error!\n");
                 return NULL;
@@ -307,13 +306,14 @@ void printf_net_structure(common_t *data){
 void recursive_load_net(FILE *file, Tstruct *child, Tstruct* parent){
     data_info_t comn;
     common_t *current;
-    int  data_size = 0;
+    int  data_size = 0, total_size = 0;
     uint32_t dim[DIM_DEPTH];
     void *data = NULL;
     while(child){
         fseek(file, (int64_t)child, SEEK_SET);
         fread(&comn, sizeof(data_info_t), 1, file);
         data = NULL;
+        total_size = 0;
         current = NULL;
         memset(dim, 0x00, sizeof(dim));
         if(comn.type >= TCONV)
@@ -321,7 +321,7 @@ void recursive_load_net(FILE *file, Tstruct *child, Tstruct* parent){
         switch(comn.type){
             case TLAYER:
             case TSHORTCUT:
-                current = (common_t*)node_create((Tstruct*)parent, comn.type, comn.dim, comn.name);
+                current = (common_t*)node_create((Tstruct*)parent, comn.type, comn.dim, comn.name,0);
                 if(!current){
                     printf("node_create error!\n");
                     return;
@@ -332,21 +332,21 @@ void recursive_load_net(FILE *file, Tstruct *child, Tstruct* parent){
                 }
                 break;
             case TBACHNORM:
-                data_size *= 3;
+                total_size = data_size * 2;
             case TCONV:
-                if(comn.len == BINARY)
-                    data_size/=32;
+                
             case TLINER:
-                current = (common_t*)node_create((Tstruct*)parent, comn.type, comn.dim, comn.name);
+                total_size += data_size;
+                if(comn.len == BINARY)
+                    total_size = data_size/32;
+                current = (common_t*)node_create((Tstruct*)parent, comn.type, comn.dim, comn.name, comn.len);
                 if(!current){
                     printf("node_create error!\n");
                     return;
                 }
-                data = ((data_info_t*)current)->data;
-                data_size += comn.dim[0];   
-                // fseek(file, (long)((data_info_t*)*net)->data, SEEK_SET);
-                // fread(data, data_size*sizeof(float), 1, file);
-                ((data_info_t*)current)->data = data;
+                total_size = (total_size+comn.dim[0])*sizeof(float);   
+                fseek(file, (long)(comn.data), SEEK_SET);
+                fread(((data_info_t*)current)->data, total_size, 1, file);
                 break;
             default:
                 printf("data type error\n");
@@ -608,7 +608,7 @@ void printf_appoint_data(char *str){
                 }
                 else{
                     printf("in binary\n");
-                    for(uint32_t i = 0;i < array_size; i++){
+                    for(uint32_t i = 0;i < d_info->dim[0]; i++){
                         printf("%f ", ((float *)d_info->data)[i+offset/(sizeof(float)*8)]);
                         if(i%16 == 15)
                                 printf("\n");
@@ -624,7 +624,11 @@ void printf_appoint_data(char *str){
                     printf("d_info->data array_size:%d\n", array_size);
                     for(uint32_t i = 0;i < array_size; i++){
                         printf("%-6f ", data[i+offset]);
-                        if(i%9 == 8)
+                        if(current->type == TCONV){
+                            if(i%9 == 8)
+                                printf("\n");
+                        }
+                        else if(i%16 == 15)
                             printf("\n");
                     }
                 }

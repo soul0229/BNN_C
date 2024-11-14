@@ -23,5 +23,6 @@ Activate_TypeDef *batchnorm_pcs(Activate_TypeDef *activate, BatchNorm *bn);
 void json_model_parse_v2(char* file_name);
 void load_ml_net(char *file_name);
 void printf_net_structure(common_t *data);
+void printf_appoint_data(char *str);
 
 #endif

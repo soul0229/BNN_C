@@ -24,12 +24,12 @@ void print_help() {
     printf("  -o, --output <file>   Output file name\n");
     printf("  -m, --model <model>   The model to run\n");
     printf("  -f, --file <file>     Specify the input file\n");
-    printf("  -n, --number <num>    Specify a number\n");
+    printf("  -n, --name <net layer name>    Specify a name\n");
 }
 
 int main(int argc, char *argv[]) {
     int opt;
-    char *file = NULL, *model = NULL, *output = NULL;
+    char *file = NULL, *model = NULL, *output = NULL, *name = NULL;
     int number = 0;
     command_t cmd;
     extern net_t *net_start;
@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
         {"model", required_argument, 0, 'm'},
         {"output", required_argument, 0, 'o'},
         {"file", required_argument, 0, 'f'},
-        {"number", required_argument, 0, 'n'},
+        {"name", required_argument, 0, 'n'},
         {"help", no_argument,       0, 'h'},
         {0, 0, 0, 0}  // 结束标志
     };
@@ -67,6 +67,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'm':
                 model = optarg;
+                break;
+            case 'n':
+                name = optarg;
                 break;
             case '?':eprint("arguments error!\n");
             case 'h':
@@ -94,6 +97,7 @@ int main(int argc, char *argv[]) {
         case PRINT:
             load_ml_net(file);
             printf_net_structure((common_t*)net_start);
+            printf_appoint_data(name);
             break;
         default:
         print_help();
