@@ -6,6 +6,19 @@
 #include "config.h"
 
 #define BNN_MAGIC "eg.BNN"
+#define WEIGHT "weight"
+#define BIAS "bias"
+#define ALPHA "alpha"
+#define MEAN "running_mean"
+#define VAR "running_var"
+
+typedef enum data_order{
+    OWEIGHT = 0,
+    OBIAS,
+    OMEAN,
+    OVAR,
+    OMAX,
+}data_order_t;
 
 typedef struct header {
     char magic[8];          
@@ -25,7 +38,7 @@ typedef enum Type_Struct{
     TSHORTCUT,
 
     TCONV,      /* data type. */
-    TBACHNORM,
+    TBATCHNORM,
     TLINER,
     TMAX,
 } Tstruct;

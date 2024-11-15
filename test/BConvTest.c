@@ -1,5 +1,7 @@
 #include "conv.h"
-
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #define KERNEL_SIZE (SIZE*SIZE)
 
 /* 以下代码用于测试验证XNOR卷积操作 */
@@ -724,45 +726,51 @@ static const float full_activate[32][64] __attribute__((unused)) =
     },
 };
 
-static CONV_KernelTypeDef kernel_t = {
-        .size = 3,
-        .in_ch = 32,
-        .out_ch = 2,
-        .kernel = (int8_t *)mc_conv_kernel,
-        .binary = BINARY,
+static data_info_t kernel_t = {
+        .dim[3] = 3,
+        .dim[2] = 3,
+        .dim[1] = 32,
+        .dim[0] = 2,
+        .data = (int8_t *)mc_conv_kernel,
+        .len = BINARY,
     };
-static Activate_TypeDef input = {
-        .size = 8,
-        .ch = 32,
-        .active = (int8_t *)mc_depthwise_activate,
-        .binary = BINARY,
+static data_info_t input = {
+        .dim[3] = 8,
+        .dim[2] = 8,
+        .dim[1] = 32,
+        .dim[0] = 1,
+        .data = (int8_t *)mc_depthwise_activate,
+        .len = BINARY,
     };
 
-static CONV_KernelTypeDef kernel_full = {
-        .size = 3,
-        .in_ch = 32,
-        .out_ch = 2,
-        .kernel = (float *)full_kernel,
-        .binary = FLOAT_BYTE,
+static data_info_t kernel_full = {
+        .dim[3] = 3,
+        .dim[2] = 3,
+        .dim[1] = 32,
+        .dim[0] = 2,
+        .data = (float *)full_kernel,
+        .len = FLOAT_BYTE,
     };
-static Activate_TypeDef input_full = {
-        .size = 8,
-        .ch = 32,
-        .active = (float *)full_activate,
-        .binary = FLOAT_BYTE,
+static data_info_t input_full = {
+        .dim[3] = 8,
+        .dim[2] = 8,
+        .dim[1] = 32,
+        .dim[0] = 1,
+        .data = (float *)full_activate,
+        .len = FLOAT_BYTE,
     };
 
 static int test(void){
-    Activate_TypeDef *output = BinarizeConv2d(&kernel_t, &input, 1, 1, 1);
+    data_info_t *output = BinarizeConv2d(&kernel_t, &input, 1, 1, 1);
     if(output == NULL){
         printf("参数错误或计算错误\n");
         return -1;
     }
-    for(uint16_t ch=0; ch<output->ch; ++ch){
-        for(uint16_t x_pos=0; x_pos<output->size; ++x_pos){
+    for(uint16_t ch=0; ch < output->dim[1]; ++ch){
+        for(uint16_t x_pos=0; x_pos<output->dim[2]; ++x_pos){
             printf("\n");
-            for(uint16_t y_pos=0; y_pos<output->size; ++y_pos)
-                printf("%-3d ",((int16_t*)(output->active))[ch*output->size*output->size+x_pos*output->size+y_pos]);
+            for(uint16_t y_pos=0; y_pos < output->dim[3]; ++y_pos)
+                printf("%-3d ",((int16_t*)(output->data))[ch*output->dim[2] * output->dim[3] + x_pos*output->dim[3] + y_pos]);
                 // printf("-- ");
         }
         printf("\n------------------------------------------------\n");
@@ -774,11 +782,11 @@ static int test(void){
         printf("参数错误或计算错误\n");
         return -1;
     }
-    for(uint16_t ch=0; ch<output->ch; ++ch){
-        for(uint16_t x_pos=0; x_pos<output->size; ++x_pos){
+    for(uint16_t ch=0; ch < output->dim[1]; ++ch){
+        for(uint16_t x_pos=0; x_pos<output->dim[2]; ++x_pos){
             printf("\n");
-            for(uint16_t y_pos=0; y_pos<output->size; ++y_pos)
-                printf("%-5.1f ",((float*)(output->active))[ch*output->size*output->size+x_pos*output->size+y_pos]);
+            for(uint16_t y_pos=0; y_pos<output->dim[3]; ++y_pos)
+                printf("%-5.1f ",((float*)(output->data))[ch*output->dim[2] * output->dim[3] + x_pos * output->dim[3] + y_pos]);
                 // printf("-- ");
         }
         printf("\n------------------------------------------------\n");
@@ -789,18 +797,19 @@ static int test(void){
     return 1;
 }
 
-void trans_tensor(CONV_KernelTypeDef *kernel, Activate_TypeDef *active, bool depthwise){
+void trans_tensor(data_info_t *kernel, data_info_t *active, bool depthwise){
     uint8_t byte_num;
     if(depthwise){
-        byte_num = kernel->in_ch/DATA_LEN;
-        for(uint16_t out_ch=0;out_ch<kernel->out_ch; ++out_ch){
+        byte_num = kernel->dim[1]/DATA_LEN;
+        for(uint16_t out_ch=0;out_ch<kernel->dim[0]; ++out_ch){
             printf("[\n");
-            for(uint16_t in_ch=0;in_ch<kernel->in_ch; ++in_ch){
+            for(uint16_t in_ch=0;in_ch<kernel->dim[1]; ++in_ch){
                 printf("    [\n");
-                for(uint16_t x_size=0;x_size<kernel->size; ++x_size){
+                for(uint16_t x_size=0;x_size<kernel->dim[2]; ++x_size){
                     printf("        [");
-                    for(uint16_t y_size=0;y_size<kernel->size; ++y_size)
-                        printf("%d.0, ",(((((intx_t*)(kernel->kernel))[(out_ch*kernel->size*kernel->size*byte_num)+x_size*kernel->size*byte_num+y_size*byte_num+in_ch/DATA_LEN]>>(in_ch%DATA_LEN))&0x01)?1:-1));
+                    for(uint16_t y_size=0;y_size<kernel->dim[3]; ++y_size)
+                        printf("%d.0, ",(((((intx_t*)(kernel->data))[(out_ch*kernel->dim[2]*kernel->dim[3]*byte_num) + \
+                        x_size*kernel->dim[3]*byte_num + y_size*byte_num+in_ch/DATA_LEN]>>(in_ch%DATA_LEN))&0x01)?1:-1));
                     printf("],\n");
                 }
                 printf("    ],\n");
@@ -809,15 +818,15 @@ void trans_tensor(CONV_KernelTypeDef *kernel, Activate_TypeDef *active, bool dep
         }
     }
     else{
-        byte_num = kernel->out_ch/DATA_LEN;
-        for(uint16_t out_ch=0;out_ch<kernel->out_ch; ++out_ch){
+        byte_num = kernel->dim[0]/DATA_LEN;
+        for(uint16_t out_ch=0;out_ch<kernel->dim[0]; ++out_ch){
             printf("[\n");
-            for(uint16_t in_ch=0;in_ch<active->ch; ++in_ch){
+            for(uint16_t in_ch=0;in_ch<active->dim[1]; ++in_ch){
                 printf("    [\n");
-                for(uint16_t x_size=0;x_size<kernel->size; ++x_size){
+                for(uint16_t x_size=0;x_size<kernel->dim[2]; ++x_size){
                     printf("        [");
-                    for(uint16_t y_size=0;y_size<kernel->size; ++y_size)
-                        printf("%d.0, ",(((((intx_t*)(kernel->kernel))[x_size*kernel->size*byte_num+y_size*byte_num+out_ch/DATA_LEN]>>(out_ch%DATA_LEN))&0x01)?1:-1));
+                    for(uint16_t y_size=0;y_size<kernel->dim[3]; ++y_size)
+                        printf("%d.0, ",(((((intx_t*)(kernel->data))[x_size*kernel->dim[3]*byte_num+y_size*byte_num+out_ch/DATA_LEN]>>(out_ch%DATA_LEN))&0x01)?1:-1));
                     printf("],\n");
                 }
                 printf("    ],\n");
@@ -826,13 +835,13 @@ void trans_tensor(CONV_KernelTypeDef *kernel, Activate_TypeDef *active, bool dep
         }
     }
 
-    byte_num = active->ch/DATA_LEN;
-    for(uint16_t in_ch=0;in_ch<active->ch; ++in_ch){
+    byte_num = active->dim[1]/DATA_LEN;
+    for(uint16_t in_ch=0;in_ch<active->dim[1]; ++in_ch){
         printf("    [\n");
-        for(uint16_t x_size=0;x_size<active->size; ++x_size){
+        for(uint16_t x_size=0;x_size<active->dim[2]; ++x_size){
             printf("        [");
-            for(uint16_t y_size=0;y_size<active->size; ++y_size)
-                printf("%d.0, ",(((((intx_t*)(active->active))[x_size*active->size*byte_num+y_size*byte_num+in_ch/DATA_LEN]>>in_ch%DATA_LEN)&0x01)?1:-1));
+            for(uint16_t y_size=0;y_size<active->dim[3]; ++y_size)
+                printf("%d.0, ",(((((intx_t*)(active->data))[x_size*active->dim[3]*byte_num+y_size*byte_num+in_ch/DATA_LEN]>>in_ch%DATA_LEN)&0x01)?1:-1));
             printf("],\n");
         }
         printf("    ],\n");

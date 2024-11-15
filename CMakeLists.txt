@@ -5,6 +5,7 @@ project(BNN VERSION 0.1 LANGUAGES C CXX ASM)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # 使能生成 compile_commands.json
+set(CONFIG_TEST_ENABLE ON)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)

@@ -99,6 +99,8 @@ int main(int argc, char *argv[]) {
             // NetStorage(json_model_parse(file), NULL, NULL, NULL, output);
             break;
         case TEST:
+            extern void BConvTest();
+            BConvTest();
             break;
         case PRINT:
             break;

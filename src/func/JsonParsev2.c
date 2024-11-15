@@ -19,26 +19,14 @@
                                         result *= dim[i];               \
                                 }while(0)
 
-#define WEIGHT "weight"
-#define BIAS "bias"
-#define MEAN "running_mean"
-#define VAR "running_var"
-
-typedef enum data_order{
-    OWEIGHT = 0,
-    OBIAS,
-    OMEAN,
-    OVAR,
-    OMAX,
-}data_order_t;
-const char *name_order[OMAX] = {[0]="weight", [1]="bias|alpha", [2]="running_mean", [3]="running_var" };
+const char *name_order[OMAX] = {[0]=WEIGHT, [1]=BIAS ALPHA, [2]=MEAN, [3]=VAR };
 const char *name_typ[] = {
     [TERROR]="error", 
     [NET_ROOT] = "root", 
     [TLAYER] = "layer", 
     [TSHORTCUT] = "shortcut", 
     [TCONV] = "conv", 
-    [TBACHNORM] = "bn",
+    [TBATCHNORM] = "bn",
     [TLINER] = "linear",
     };
 
@@ -85,9 +73,8 @@ static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], 
         case TLAYER:
         case TSHORTCUT:
             node = malloc(sizeof(container_t));
-            malloc_size = 0;
             break;
-        case TBACHNORM:
+        case TBATCHNORM:
             malloc_size = arry_size * 2;
         case TCONV:
         case TLINER:
@@ -129,8 +116,8 @@ static Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], 
     return (Tstruct*)node;
 }
 
-static common_t *grep_obj_child(common_t *data, char *name){
-    common_t *ret = data?(common_t *)data->child:(common_t *)Net.child;
+static common_t *grep_obj_child(common_t *parent, char *name){
+    common_t *ret = parent?(common_t *)parent->child:(common_t *)Net.child;
     while(ret){
         dbg_print("%s %s result:%d\n", ret->name, name, strcmp(ret->name, name) == 0);
         if(strcmp(ret->name, name) == 0)
@@ -292,7 +279,7 @@ void printf_net_structure(common_t *data){
                     printf_net_structure((common_t *)stage->child);
                 break;
             case TCONV:
-            case TBACHNORM:
+            case TBATCHNORM:
             case TLINER:
                 printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], ((int)(8-strlen(stage->name))/2 < 0)?0:(int)(8-strlen(stage->name))/2, "    ",  stage->name);
                 break;
@@ -333,7 +320,7 @@ void recursive_load_net(FILE *file, Tstruct *child, Tstruct* parent){
                     recursive_load_net(file, comn.reserve, (Tstruct*)current);
                 }
                 break;
-            case TBACHNORM:
+            case TBATCHNORM:
                 total_size = data_size * 2;
             case TCONV:
                 
@@ -413,7 +400,7 @@ int get_child_size(common_t *data){
                 size_cnt += alignidx(get_child_size((common_t *)data->child), 4);
                 break;
             case TCONV:
-            case TBACHNORM:
+            case TBATCHNORM:
             case TLINER:
                 size_cnt += alignidx(sizeof(data_info_t), 4);
                 break;
@@ -456,7 +443,7 @@ void net_data_storage(common_t *data, FILE *file, int node_offset, int *data_off
                     net_data_storage((common_t *)stage->child, file, node_offset, data_offset);
                 node_offset += sibling_offset;
                 break;
-            case TBACHNORM:
+            case TBATCHNORM:
                 data_size *= 3;
             case TCONV:
                 if(((data_info_t*)stage)->len == BINARY)
@@ -552,7 +539,7 @@ void binary_net_data(common_t *data){
                     d_info->len = BINARY;
                 }
                 break;
-            case TBACHNORM:
+            case TBATCHNORM:
             case TLINER:
                 break;
         default:break;
@@ -711,7 +698,7 @@ void free_net(common_t **net){
                 free(sibling);
                 break;
             case TCONV:
-            case TBACHNORM:
+            case TBATCHNORM:
             case TLINER:
                 dbg_print("%s\n", sibling->name);
                 ((common_t *)sibling->parent)->child = sibling->sibling;

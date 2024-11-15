@@ -1,4 +1,4 @@
-set(TEST_SRC "")
+set(TEST_SRC "./BConvTest.c")
 if (CONFIG_TEST_ENABLE)
     aux_source_directory(${CMAKE_CURRENT_LIST_DIR} TEST_SRC)
     add_library(test OBJECT ${TEST_SRC})
