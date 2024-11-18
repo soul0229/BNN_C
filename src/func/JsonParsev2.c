@@ -611,14 +611,28 @@ void printf_appoint_data(char *str, common_t *data){
                 if (d_info->data != NULL) {
                     float *data = (float *)d_info->data;
                     printf("d_info->data array_size:%d\n", array_size);
-                    for(uint32_t i = 0;i < array_size; i++){
-                        printf("%-6f ", data[i+offset]);
-                        if(current->type == TCONV){
-                            if(i%9 == 8)
+                    if(offset == 0){
+                        for(uint32_t i = 0;i < array_size; i++){
+                            printf("%-6f ", data[i]);
+                            if(current->type == TCONV){
+                                if(i%9 == 8)
+                                    printf("\n");
+                            }
+                            else if(i%16 == 15)
                                 printf("\n");
                         }
-                        else if(i%16 == 15)
-                            printf("\n");
+                    }
+                    else {
+                        for(uint32_t i = 0;i < d_info->dim[0]; i++){
+                            printf("%-6f ", data[i+offset]);
+                            if(current->type == TCONV){
+                                if(i%9 == 8)
+                                    printf("\n");
+                            }
+                            else if(i%16 == 15)
+                                printf("\n");
+                        }
+                        if(d_info->dim[0]<15)printf("\n");
                     }
                 }
                 else

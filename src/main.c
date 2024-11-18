@@ -103,14 +103,15 @@ int main(int argc, char *argv[]) {
             BConvTest();
             break;
         case PRINT:
+            load_ml_net(file);
+            printf_appoint_data(name, (common_t*)net_start);
+            free_net((common_t**)&net_start);
             break;
         case LOAD:
             load_ml_net(file);
             printf_net_structure((common_t*)net_start);
             printf_appoint_data(name, (common_t*)net_start);
             free_net((common_t**)&net_start);
-            printf("ok\n");
-            printf_net_structure((common_t*)net_start);
             break;
         default:
         print_help();

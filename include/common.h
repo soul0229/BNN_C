@@ -52,6 +52,7 @@
 enum data_len{
     UNKNOW = 0,
     BINARY,
+    ONE_BYTE,
     TWO_BYTE,
     FLOAT_BYTE,
 };

@@ -1,4 +1,5 @@
-#include "utils.h"
+#include <stdint.h>
+#include <stdio.h>
 
 void bitcont_generate(){
     uint16_t i, j;
