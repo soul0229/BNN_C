@@ -5,8 +5,8 @@
 #include <stdbool.h>
 #include "config.h"
 
-#define align16(x)              (((x)+(16-1))-(((x)+(16-1))%16))
 #define alignidx(size, idx)     (((size)+(idx-1))-(((size)+(idx-1))%idx))
+#define align16(x)              alignidx(x,16)
 #define PARTSIZE(type,mem) ((unsigned long)(&(((type *)0)->mem)))
 
 #define RGB_PRINT
@@ -57,5 +57,16 @@ enum data_len{
     FLOAT_BYTE,
 };
 typedef enum data_len Data_Len;
+
+#define INIT_DIM(dim,num)   do {                                    \
+                                for(int i = 0; i < DIM_DEPTH; i++)  \
+                                    dim[i] = num;                   \
+                            }while(0)
+#define ARRAY_SIZE(dim, result) do{                                     \
+                                    result = dim[0];                    \
+                                    for(int i = 1; i < DIM_DEPTH; i++)  \
+                                        result *= dim[i];               \
+                                }while(0)
+
 
 #endif

@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <getopt.h>
 #include "core.h"
 #include "utils.h"
-#include <getopt.h>
+#include "loadNet.h"
 
 typedef enum command{
     DEFAULT=0,
@@ -34,7 +35,6 @@ int main(int argc, char *argv[]) {
     char *file = NULL, *model = NULL, *output = NULL, *name = NULL;
     int number = 0;
     command_t cmd;
-    extern net_t *net_start;
 
     // 定义长选项
     static struct option long_options[] = {
@@ -104,14 +104,14 @@ int main(int argc, char *argv[]) {
             break;
         case PRINT:
             load_ml_net(file);
-            printf_appoint_data(name, (common_t*)net_start);
-            free_net((common_t**)&net_start);
+            printf_appoint_data(name, (common_t*)Net);
+            free_net((common_t**)&Net);
             break;
         case LOAD:
             load_ml_net(file);
-            printf_net_structure((common_t*)net_start);
-            printf_appoint_data(name, (common_t*)net_start);
-            free_net((common_t**)&net_start);
+            printf_net_structure((common_t*)Net);
+            printf_appoint_data(name, (common_t*)Net);
+            free_net((common_t**)&Net);
             break;
         default:
         print_help();

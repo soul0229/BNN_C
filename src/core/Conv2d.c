@@ -4,7 +4,7 @@
 #include "common.h"
 #include "conv.h"
 
-const conv_offset offset[3][3] = {
+static const conv_offset offset[3][3] = {
     {{-1, -1,},{-1, 0,},{-1, 1,},},
     {{0, -1,}, {0, 0,}, {0, 1,},},
     {{1, -1,}, {1, 0,}, {1, 1,},},
@@ -42,7 +42,7 @@ static const int8_t bit_cont[256] = {
 
 static const uint64_t xnor_in[2] = {0xffffffffffffffff, 0x0000000000000000};
 
-data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t* input, uint8_t stride, uint8_t padding, bool depthwise){
+data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t *input, uint8_t stride, uint8_t padding, bool depthwise){
     if(input->dim[1]/DATA_LEN <= 0)
         return NULL;
     data_info_t *output = malloc(sizeof(data_info_t));
@@ -125,7 +125,7 @@ data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t* input, uint8_t str
     return output;
 }
 
-data_info_t *Conv2d(data_info_t *kernel, data_info_t* input, uint8_t stride, uint8_t padding, bool depthwise){
+data_info_t *Conv2d(data_info_t *kernel, data_info_t *input, uint8_t stride, uint8_t padding, bool depthwise){
     data_info_t *output = malloc(sizeof(data_info_t));
     output->dim[3] = (input->dim[3]+padding*2-kernel->dim[3])/stride+1;
     output->dim[2] = output->dim[3];

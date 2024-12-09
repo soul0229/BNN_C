@@ -6,9 +6,7 @@
 #include "utils.h"
 #include "core.h"
 
-extern net_t *net_start;
-
-data_info_t *data_binary(data_info_t *input){
+static data_info_t *data_binary(data_info_t *input){
     if(!(input && input->data && input->len == FLOAT_BYTE))
         return NULL;
     float (*in_data)[input->dim[2]][input->dim[3]][input->dim[1]] = input->data;
@@ -24,25 +22,50 @@ data_info_t *data_binary(data_info_t *input){
     return input;
 }
 
-void net_nference(common_t *net, data_info_t *input){
+static data_info_t *data_add(data_info_t *input1, data_info_t *input2){
+    if(!(input1 && input1->data && input1->len == FLOAT_BYTE))
+        return NULL;
+    if(!(input2 && input2->data && input2->len == FLOAT_BYTE))
+        return NULL;
+    float (*data1)[input1->dim[2]][input1->dim[3]][input1->dim[1]] = input1->data;
+    float (*data2)[input2->dim[2]][input2->dim[3]][input2->dim[1]] = input2->data;
+
+    for(uint16_t dim1 = 0; dim1 < input1->dim[1]; ++dim1)
+        for(uint16_t dim2 = 0; dim2 < input1->dim[2]; ++dim2)
+            for(uint16_t dim3 = 0; dim3 < input1->dim[3]; ++dim3)
+                data1[0][dim2][dim3][dim1] += data2[0][dim2][dim3][dim1];
+
+    return input1;
+}
+
+data_info_t *net_inference(common_t *net, data_info_t *input){
     common_t *stage = net;
-    data_info_t *output = NULL;
+    data_info_t *output = input, *shuortcut = NULL, *temp = NULL;
     while(stage != NULL){
         switch(stage->type){
             case NET_ROOT:
             case TLAYER:
                 if(stage->child != NULL)
-                    net_nference((common_t *)stage->child, input);
+                    output = net_inference((common_t *)stage->child, output);
+                if((common_t *)stage->sibling && ((common_t *)stage->sibling)->type != TLAYER)
+                    output = avg_pool(output, output->dim[3]);
                 break;
             case TSHORTCUT:
                 if(stage->child != NULL)
-                    net_nference((common_t *)stage->child, input);
+                    shuortcut = net_inference((common_t *)stage->child, input);
                 break;
             case TCONV:
+                temp = output;
                 if(((common_t *)stage->parent)->type == NET_ROOT)
-                    output = Conv2d((data_info_t *)stage, input, 1, 1, 1);
+                    output = Conv2d((data_info_t *)stage, output, 1, 1, 1);
                 else{
-                    output = BinarizeConv2d((data_info_t *)stage, input, (input->dim[0] == input->dim[1])?1:2, 1, 1);
+                    output = data_binary(output);
+                    output = BinarizeConv2d((data_info_t *)stage, output, ((data_info_t *)stage)->dim[0]/((data_info_t *)stage)->dim[1], 1, 1);
+                }
+                if(temp && temp != input){
+                    free(temp->data);
+                    free(temp);
+                    temp =NULL;
                 }
                 break;
             case TBATCHNORM:
@@ -57,11 +80,24 @@ void net_nference(common_t *net, data_info_t *input){
         }
         stage = (common_t *)stage->sibling;
     }
+
+    if(((common_t *)net->parent)->type == TLAYER && net->type >= TCONV){
+        output = data_add(output, shuortcut?shuortcut:input);
+        free(input->data);
+        free(input);
+    }
+
+    return output;
 }
 
 void resnet18(data_info_t *input){
     if(!input)
         return;
-    net_t *net = net_start;
-
+    net_t *net = Net;
+    data_info_t *output = net_inference((common_t*)net, input);
+    if(!output){
+        printf("net inference error!\n");
+        return;
+    }
+    printf("dim[%d][%d][%d][%d]", output->dim[0], output->dim[1], output->dim[2], output->dim[3]);
 }

@@ -83,4 +83,22 @@ struct common{
 };
 typedef struct common common_t;
 
+struct opts{
+    data_info_t (*data_binary)(data_info_t *);
+    data_info_t (*net_inference)(common_t *, data_info_t *);
+    data_info_t (*BinarizeConv2d)(data_info_t *, data_info_t *, uint8_t, uint8_t, bool);
+    data_info_t (*Conv2d)(data_info_t *, data_info_t *, uint8_t, uint8_t, bool);
+};
+
+typedef struct _global_data{
+    net_t *net;
+    struct opts ops;
+} global_data;
+
+extern global_data gd;
+#define Net (gd.net)
+
+Tstruct *node_create(Tstruct *dad, Tstruct new, uint32_t dim[DIM_DEPTH], char *name, Data_Len len);
+void reverse_nodes(common_t *parent);
+
 #endif
