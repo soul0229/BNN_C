@@ -3,6 +3,22 @@
 #include <stdint.h>
 #include <core.h>
 
+enum DATASET_INFO {
+    CIFAR = 0,
+    IMAGENET,
+    DSET_NUM,
+
+    DSET_MEAN = 0,
+    DSET_STD,
+    HANDLE_NUM,
+    
+    RED = 0,
+    GREEN,
+    BLUE,
+    CHANNEL_NUM
+};
+
+data_info_t *Compose_RGB_data(data_info_t *input, enum DATASET_INFO dset_sel);
 data_info_t *bachnorm(data_info_t *input, data_info_t *batchnorm);
 data_info_t *linear_data(data_info_t *input, data_info_t *linear);
 data_info_t *avg_pool(data_info_t *input, uint8_t size);

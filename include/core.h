@@ -40,7 +40,10 @@ typedef enum Type_Struct{
     TCONV,      /* data type. */
     TBATCHNORM,
     TLINER,
+    
     TMAX,
+    BASICBLOCK,
+    ACTIVATE,
 } Tstruct;
 
 struct data_info{
@@ -92,7 +95,7 @@ struct opts{
 
 typedef struct _global_data{
     net_t *net;
-    struct opts ops;
+    struct opts *ops;
 } global_data;
 
 extern global_data gd;

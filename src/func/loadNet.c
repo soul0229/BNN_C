@@ -7,6 +7,20 @@
 #include "core.h"
 #include "utils.h"
 
+bool file_check(FILE *file){
+    header_t head;
+
+    if(!file) return false;
+
+    fseek(file, 0, SEEK_SET);
+    fread(&head, sizeof(header_t), 1, file);
+    
+    if(strcmp(head.magic, BNN_MAGIC)){
+        return false;
+    }
+    return true;
+}
+
 static void recursive_load_net(FILE *file, uint32_t child, Tstruct* parent){
     data_storage comn;
     common_t *current;

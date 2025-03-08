@@ -4,13 +4,8 @@
 #include "core.h"
 
 global_data gd = {
-    .net = NULL,
-    {
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-    },
+    NULL,
+    NULL,
 };
 
 int regesiter_func(){
@@ -93,4 +88,13 @@ void reverse_nodes(common_t *parent)
 		parent->child = (Tstruct *)child;
 		child = next;
 	}
+}
+
+void core_init(struct opts *ops){
+    if(!ops)
+        return;
+    if(ops->BinarizeConv2d && ops->Conv2d && ops->data_binary && ops->net_inference)
+        gd.ops = ops;
+    else
+        return;
 }

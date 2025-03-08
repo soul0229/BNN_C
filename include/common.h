@@ -11,7 +11,7 @@
 
 #define RGB_PRINT
 #if defined(RGB_PRINT)
-#define clrprint(clr,str,...) printf("\033[%dm" str "\033[0m",clr,##__VA_ARGS__)
+#define clrprint(clr,str,...) printf("%s:%d" "\033[%dm" str "\033[0m",__FILE__,__LINE__,clr,##__VA_ARGS__)
 #else
 #define clrprint(clr,str,...) printf(str,##__VA_ARGS__)
 #endif

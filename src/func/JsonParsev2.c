@@ -34,7 +34,7 @@ static void read_multi_dim_array(cJSON *array, void **data){
 
     if(!cJSON_IsArray(array)) {
         *((float *)(*data)) = array->valuedouble;
-        dbg_print("%f ", *((float *)(*data)));
+        // dbg_print("%f ", *((float *)(*data)));
         *data += sizeof(float);
         return;
     }

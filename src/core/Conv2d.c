@@ -42,7 +42,7 @@ static const int8_t bit_cont[256] = {
 
 static const uint64_t xnor_in[2] = {0xffffffffffffffff, 0x0000000000000000};
 
-data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t *input, uint8_t stride, uint8_t padding, bool depthwise){
+data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t *input, uint8_t stride, uint8_t padding){
     if(input->dim[1]/DATA_LEN <= 0)
         return NULL;
     data_info_t *output = malloc(sizeof(data_info_t));
@@ -56,31 +56,33 @@ data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t *input, uint8_t str
     intx_t (*kernel_data)[kernel->dim[2]][kernel->dim[3]][kernel->dim[1]/DATA_LEN] = kernel->data;
     intx_t (*input_data)[input->dim[2]][input->dim[3]][input->dim[1]/DATA_LEN] = input->data;
 
-    if(depthwise){
-        if(input->dim[1] != kernel->dim[1] || input->dim[1]%DATA_LEN != 0){
-            free(output->data); 
-            free(output); 
-            return NULL;
-        }
-        for (uint16_t out_ch = 0; out_ch < kernel->dim[0]; ++out_ch) {//kernel->out_ch:输出通道数
-            for (uint16_t kernel_xpos = 0; kernel_xpos < kernel->dim[2]; ++kernel_xpos) {//卷积核元素3选1
-                for (uint16_t kernel_ypos = 0; kernel_ypos < kernel->dim[3]; ++kernel_ypos){ //卷积核元素3选1
-                    for (uint16_t x_pos = 0; x_pos < input->dim[2]; x_pos += stride) {
-                        for (uint16_t y_pos = 0; y_pos < input->dim[3]; y_pos += stride) {
-                            int16_t x_input = x_pos + (offset[kernel_xpos][kernel_ypos].x_start * padding);
-                            int16_t y_input = y_pos + (offset[kernel_xpos][kernel_ypos].y_start * padding);
-                            if (x_input >= 0 && x_input < input->dim[2] && y_input >= 0 && y_input < input->dim[3]) {//判断是否与0同或
-                                for (uint16_t in_ch = 0; in_ch < input->dim[1]/DATA_LEN; ++in_ch) {//in_channel/8:所有输入通道所占字节数
-                                    data[0][x_pos/stride][y_pos/stride][out_ch] += \
-                                        BIT_CONT(~(kernel_data[out_ch][kernel_xpos][kernel_ypos][in_ch] ^ input_data[0][x_input][y_input][in_ch])&(~(xnor_in[0]<<DATA_LEN)));
-                                }
-                            } else {
-                                #ifndef USE_PADDING_ZERO
-                                for (uint16_t in_ch = 0; in_ch < input->dim[1]/DATA_LEN; ++in_ch) {//in_channel/8:所有输入通道所占字节数
-                                    data[0][x_pos/stride][y_pos/stride][out_ch] += \
-                                        BIT_CONT((kernel_data[out_ch][kernel_xpos][kernel_ypos][in_ch] ^ xnor_in[0])&(~(xnor_in[0]<<DATA_LEN)));//异或1等于同或0
-                                }
-                                #endif
+
+    if(input->dim[1] != kernel->dim[1] || input->dim[1]%DATA_LEN != 0){
+        free(output->data); 
+        free(output); 
+        return NULL;
+    }
+    for (uint16_t out_ch = 0; out_ch < kernel->dim[0]; ++out_ch) {//kernel->out_ch:输出通道数
+        for (uint16_t kernel_xpos = 0; kernel_xpos < kernel->dim[2]; ++kernel_xpos) {//卷积核元素3选1
+            for (uint16_t kernel_ypos = 0; kernel_ypos < kernel->dim[3]; ++kernel_ypos){ //卷积核元素3选1
+                for (uint16_t x_pos = 0; x_pos < input->dim[2]; x_pos += stride) {
+                    int16_t x_input = x_pos + (offset[kernel_xpos][kernel_ypos].x_start * padding);
+                    if(x_input < 0 || x_input >= input->dim[3])continue;
+                    for (uint16_t y_pos = 0; y_pos < input->dim[3]; y_pos += stride) {
+                        int16_t y_input = y_pos + (offset[kernel_xpos][kernel_ypos].y_start * padding);
+                        if (y_input < 0 || y_input >= input->dim[3]) {//判断是否与0同或
+                            #ifndef USE_PADDING_ZERO
+                            for (uint16_t in_ch = 0; in_ch < input->dim[1]/DATA_LEN; ++in_ch) {//in_channel/8:所有输入通道所占字节数
+                                data[0][x_pos/stride][y_pos/stride][out_ch] += \
+                                    BIT_CONT((kernel_data[out_ch][kernel_xpos][kernel_ypos][in_ch] ^ xnor_in[0])&(~(xnor_in[0]<<DATA_LEN)));//异或1等于同或0
+                            }
+                            #else
+                                continue;
+                            #endif
+                        } else {
+                            for (uint16_t in_ch = 0; in_ch < input->dim[1]/DATA_LEN; ++in_ch) {//in_channel/8:所有输入通道所占字节数
+                                data[0][x_pos/stride][y_pos/stride][out_ch] += \
+                                    BIT_CONT(~(kernel_data[out_ch][kernel_xpos][kernel_ypos][in_ch] ^ input_data[0][x_input][y_input][in_ch])&(~(xnor_in[0]<<DATA_LEN)));
                             }
                         }
                     }
@@ -88,44 +90,11 @@ data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t *input, uint8_t str
             }
         }
     }
-    else{
-        if(kernel->dim[1] != 1 || input->dim[1]%DATA_LEN != 0){
-            free(output->data); 
-            free(output); 
-            return NULL;
-        }
-        for (uint16_t out_ch = 0; out_ch < kernel->dim[0]; ++out_ch) {//kernel->out_ch:输出通道数
-            for (uint16_t kernel_xpos = 0; kernel_xpos < kernel->dim[2]; ++kernel_xpos) {//卷积核元素3选1
-                for (uint16_t kernel_ypos = 0; kernel_ypos < kernel->dim[3]; ++kernel_ypos){ //卷积核元素3选1
-                    for (uint16_t x_pos = 0; x_pos < input->dim[2]; x_pos += stride) {
-                        for (uint16_t y_pos = 0; y_pos < input->dim[3]; y_pos += stride) {
-                            int16_t x_input = x_pos + (offset[kernel_xpos][kernel_ypos].x_start * padding);
-                            int16_t y_input = y_pos + (offset[kernel_xpos][kernel_ypos].y_start * padding);
-                            if (x_input >= 0 && x_input < input->dim[2] && y_input >= 0 && y_input < input->dim[3]) {//判断是否与0同或
-                                for (uint16_t in_ch = 0; in_ch < input->dim[1]/DATA_LEN; ++in_ch) {//in_channel/8:所有输入通道所占字节数
-                                    data[0][x_pos/stride][y_pos/stride][out_ch] += \
-                                        BIT_CONT((xnor_in[(kernel_data[0][kernel_xpos][kernel_ypos][out_ch/DATA_LEN] >> out_ch)&0x01] ^ 
-                                            input_data[0][x_input][y_input][in_ch])&(~(xnor_in[0]<<DATA_LEN)));
-                                }
-                            } else {
-                                #ifndef USE_PADDING_ZERO
-                                for (uint16_t in_ch = 0; in_ch < byte_num; ++in_ch) {//in_channel/8:所有输入通道所占字节数
-                                data[0][x_pos/stride][y_pos/stride][out_ch] +=
-                                        BIT_CONT((xnor_in[(kernel_data[0][kernel_xpos][kernel_ypos][out_ch/DATA_LEN] >> out_ch)&0x01] ^ \
-                                        xnor_in[1])&(~(xnor_in[0]<<DATA_LEN)));//异或1等于同或0
-                                }
-                                #endif
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+
     return output;
 }
 
-data_info_t *Conv2d(data_info_t *kernel, data_info_t *input, uint8_t stride, uint8_t padding, bool depthwise){
+data_info_t *Conv2d(data_info_t *kernel, data_info_t *input, uint8_t stride, uint8_t padding){
     data_info_t *output = malloc(sizeof(data_info_t));
     output->dim[3] = (input->dim[3]+padding*2-kernel->dim[3])/stride+1;
     output->dim[2] = output->dim[3];
@@ -138,51 +107,24 @@ data_info_t *Conv2d(data_info_t *kernel, data_info_t *input, uint8_t stride, uin
 
     if(input->len == ONE_BYTE){   
         uint8_t (*input_data)[input->dim[1]][input->dim[2]][input->dim[3]] = input->data;
-        if(depthwise){
-            if(kernel->dim[1] != input->dim[1]){
-                free(output->data); 
-                free(output); 
-                return NULL;
-            }
-            for (uint16_t out_ch = 0; out_ch < kernel->dim[0]; ++out_ch) {//kernel->out_ch:输出通道数
-                for (uint16_t in_ch = 0; in_ch < input->dim[1]; ++in_ch) {
-                    for (uint16_t kernel_xpos = 0; kernel_xpos < kernel->dim[2]; ++kernel_xpos) {//卷积核元素3选1
-                        for (uint16_t kernel_ypos = 0; kernel_ypos < kernel->dim[3]; ++kernel_ypos){ //卷积核元素3选1
-                            for (uint16_t x_pos = 0; x_pos < input->dim[2]; x_pos += stride) {
-                                for (uint16_t y_pos = 0; y_pos < input->dim[3]; y_pos += stride) {
-                                    int16_t x_input = x_pos + (offset[kernel_xpos][kernel_ypos].x_start * padding);
-                                    int16_t y_input = y_pos + (offset[kernel_xpos][kernel_ypos].y_start * padding);
-                                    if (x_input >= 0 && x_input < input->dim[2] && y_input >= 0 && y_input < input->dim[3]) {//判断是否与0同或
-                                        data[0][x_pos/stride][y_pos/stride][out_ch]+= \
-                                        input_data[0][in_ch][x_input][y_input] * kernel_data[out_ch][in_ch][kernel_xpos][kernel_ypos];
-                                    }
-                                } 
-                            }
-                        }
-                    }
-                }
-            }
+        if(kernel->dim[1] != input->dim[1]){
+            free(output->data); 
+            free(output); 
+            return NULL;
         }
-        else{
-            if(kernel->dim[1] != 1){
-                free(output->data); 
-                free(output); 
-                return NULL;
-            }
-            for (uint16_t out_ch = 0; out_ch < kernel->dim[0]; ++out_ch) {//kernel->out_ch:输出通道数
-                for (uint16_t in_ch = 0; in_ch < input->dim[1]; ++in_ch) {
-                    for (uint16_t kernel_xpos = 0; kernel_xpos < kernel->dim[2]; ++kernel_xpos) {//卷积核元素3选1
-                        for (uint16_t kernel_ypos = 0; kernel_ypos < kernel->dim[3]; ++kernel_ypos){ //卷积核元素3选1
-                            for (uint16_t x_pos = 0; x_pos < input->dim[2]; x_pos += stride) {
-                                for (uint16_t y_pos = 0; y_pos < input->dim[3]; y_pos += stride) {
-                                    int16_t x_input = x_pos + (offset[kernel_xpos][kernel_ypos].x_start * padding);
-                                    int16_t y_input = y_pos + (offset[kernel_xpos][kernel_ypos].y_start * padding);
-                                    if (x_input >= 0 && x_input < input->dim[2] && y_input >= 0 && y_input < input->dim[3]) {//判断是否与0同或
-                                        data[0][x_pos/stride][y_pos/stride][out_ch]+= \
-                                            input_data[0][in_ch][x_input][y_input] * kernel_data[0][out_ch][kernel_xpos][kernel_ypos];
-                                    }
-                                } 
-                            }
+        for (uint16_t out_ch = 0; out_ch < kernel->dim[0]; ++out_ch) {//kernel->out_ch:输出通道数
+            for (uint16_t in_ch = 0; in_ch < input->dim[1]; ++in_ch) {
+                for (uint16_t kernel_xpos = 0; kernel_xpos < kernel->dim[2]; ++kernel_xpos) {//卷积核元素3选1
+                    for (uint16_t kernel_ypos = 0; kernel_ypos < kernel->dim[3]; ++kernel_ypos){ //卷积核元素3选1
+                        for (uint16_t x_pos = 0; x_pos < input->dim[2]; x_pos += stride) {
+                            for (uint16_t y_pos = 0; y_pos < input->dim[3]; y_pos += stride) {
+                                int16_t x_input = x_pos + (offset[kernel_xpos][kernel_ypos].x_start * padding);
+                                int16_t y_input = y_pos + (offset[kernel_xpos][kernel_ypos].y_start * padding);
+                                if (x_input >= 0 && x_input < input->dim[2] && y_input >= 0 && y_input < input->dim[3]) {//判断是否与0同或
+                                    data[0][x_pos/stride][y_pos/stride][out_ch]+= \
+                                    input_data[0][in_ch][x_input][y_input] * kernel_data[out_ch][in_ch][kernel_xpos][kernel_ypos];
+                                }
+                            } 
                         }
                     }
                 }
@@ -191,51 +133,24 @@ data_info_t *Conv2d(data_info_t *kernel, data_info_t *input, uint8_t stride, uin
     }
     else if(input->len == FLOAT_BYTE){   
         float (*input_data)[input->dim[1]][input->dim[2]][input->dim[3]] = input->data;
-        if(depthwise){
-            if(kernel->dim[1] != input->dim[1]){
-                free(output->data); 
-                free(output); 
-                return NULL;
-            }
-            for (uint16_t out_ch = 0; out_ch < kernel->dim[0]; ++out_ch) {//kernel->out_ch:输出通道数
-                for (uint16_t in_ch = 0; in_ch < input->dim[1]; ++in_ch) {
-                    for (uint16_t kernel_xpos = 0; kernel_xpos < kernel->dim[2]; ++kernel_xpos) {//卷积核元素3选1
-                        for (uint16_t kernel_ypos = 0; kernel_ypos < kernel->dim[3]; ++kernel_ypos){ //卷积核元素3选1
-                            for (uint16_t x_pos = 0; x_pos < input->dim[2]; x_pos += stride) {
-                                for (uint16_t y_pos = 0; y_pos < input->dim[3]; y_pos += stride) {
-                                    int16_t x_input = x_pos + (offset[kernel_xpos][kernel_ypos].x_start * padding);
-                                    int16_t y_input = y_pos + (offset[kernel_xpos][kernel_ypos].y_start * padding);
-                                    if (x_input >= 0 && x_input < input->dim[2] && y_input >= 0 && y_input < input->dim[3]) {//判断是否与0同或
-                                        data[0][x_pos/stride][y_pos/stride][out_ch]+= \
-                                        input_data[0][in_ch][x_input][y_input] * kernel_data[out_ch][in_ch][kernel_xpos][kernel_ypos];
-                                    }
-                                } 
-                            }
-                        }
-                    }
-                }
-            }
+        if(kernel->dim[1] != input->dim[1]){
+            free(output->data); 
+            free(output); 
+            return NULL;
         }
-        else{
-            if(kernel->dim[1] != 1){
-                free(output->data); 
-                free(output); 
-                return NULL;
-            }
-            for (uint16_t out_ch = 0; out_ch < kernel->dim[0]; ++out_ch) {//kernel->out_ch:输出通道数
-                for (uint16_t in_ch = 0; in_ch < input->dim[1]; ++in_ch) {
-                    for (uint16_t kernel_xpos = 0; kernel_xpos < kernel->dim[2]; ++kernel_xpos) {//卷积核元素3选1
-                        for (uint16_t kernel_ypos = 0; kernel_ypos < kernel->dim[3]; ++kernel_ypos){ //卷积核元素3选1
-                            for (uint16_t x_pos = 0; x_pos < input->dim[2]; x_pos += stride) {
-                                for (uint16_t y_pos = 0; y_pos < input->dim[3]; y_pos += stride) {
-                                    int16_t x_input = x_pos + (offset[kernel_xpos][kernel_ypos].x_start * padding);
-                                    int16_t y_input = y_pos + (offset[kernel_xpos][kernel_ypos].y_start * padding);
-                                    if (x_input >= 0 && x_input < input->dim[2] && y_input >= 0 && y_input < input->dim[3]) {//判断是否与0同或
-                                        data[0][x_pos/stride][y_pos/stride][out_ch]+= \
-                                            input_data[0][in_ch][x_input][y_input] * kernel_data[0][out_ch][kernel_xpos][kernel_ypos];
-                                    }
-                                } 
-                            }
+        for (uint16_t out_ch = 0; out_ch < kernel->dim[0]; ++out_ch) {//kernel->out_ch:输出通道数
+            for (uint16_t in_ch = 0; in_ch < input->dim[1]; ++in_ch) {
+                for (uint16_t kernel_xpos = 0; kernel_xpos < kernel->dim[2]; ++kernel_xpos) {//卷积核元素3选1
+                    for (uint16_t kernel_ypos = 0; kernel_ypos < kernel->dim[3]; ++kernel_ypos){ //卷积核元素3选1
+                        for (uint16_t x_pos = 0; x_pos < input->dim[2]; x_pos += stride) {
+                            for (uint16_t y_pos = 0; y_pos < input->dim[3]; y_pos += stride) {
+                                int16_t x_input = x_pos + (offset[kernel_xpos][kernel_ypos].x_start * padding);
+                                int16_t y_input = y_pos + (offset[kernel_xpos][kernel_ypos].y_start * padding);
+                                if (x_input >= 0 && x_input < input->dim[2] && y_input >= 0 && y_input < input->dim[3]) {//判断是否与0同或
+                                    data[0][x_pos/stride][y_pos/stride][out_ch]+= \
+                                    input_data[0][in_ch][x_input][y_input] * kernel_data[out_ch][in_ch][kernel_xpos][kernel_ypos];
+                                }
+                            } 
                         }
                     }
                 }
