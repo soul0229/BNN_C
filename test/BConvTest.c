@@ -46,6 +46,15 @@ static const uint8_t mc_conv_kernel[2][KERNEL_SIZE][32/BYTE_SIZE] __attribute__(
     }, 
 };
 
+static const uint8_t mc_conv_kernel_1x1[2][1][32/BYTE_SIZE] __attribute__((unused)) = {
+    {
+        {0x01,0x10,0x02,0x20},
+        },
+    {
+        {0x81,0x10,0x01,0x20},
+        }, 
+    };
+
 static const uint8_t depthwise_activate[8*8] __attribute__((unused)) = {
     0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,
     0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,
@@ -735,6 +744,15 @@ static data_info_t kernel_t = {
         .data = (int8_t *)mc_conv_kernel,
         .len = BINARY,
     };
+
+static data_info_t kernel_1x1 = {
+        .dim[3] = 1,
+        .dim[2] = 1,
+        .dim[1] = 32,
+        .dim[0] = 2,
+        .data = (int8_t *)mc_conv_kernel_1x1,
+        .len = BINARY,
+    };
 static data_info_t input = {
         .dim[3] = 8,
         .dim[2] = 8,
@@ -762,38 +780,38 @@ static data_info_t input_full = {
     };
 
 static int test(void){
-    data_info_t *output = BinarizeConv2d(&kernel_t, &input, 1, 1);
+    data_info_t *output = BinarizeConv2d(&kernel_1x1, &input, 2, 0);
     if(output == NULL){
         printf("参数错误或计算错误\n");
         return -1;
     }
-    int16_t (*data)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
+    float (*data)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
     for(uint16_t ch=0; ch < output->dim[1]; ++ch){
         for(uint16_t x_pos=0; x_pos<output->dim[2]; ++x_pos){
             printf("\n");
             for(uint16_t y_pos=0; y_pos < output->dim[3]; ++y_pos)
-                printf("%-3hd ", data[0][x_pos][y_pos][ch]);
+                printf("%-5.1f ", data[0][x_pos][y_pos][ch]);
         }
         printf("\n------------------------------------------------\n");
     }
     free(output);
 
-    output = Conv2d(&kernel_full, &input_full, 1, 1);
-    if(output == NULL){
-        printf("参数错误或计算错误\n");
-        return -1;
-    }
-    float (*fdata)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
-    for(uint16_t ch=0; ch < output->dim[1]; ++ch){
-        for(uint16_t x_pos=0; x_pos<output->dim[2]; ++x_pos){
-            printf("\n");
-            for(uint16_t y_pos=0; y_pos<output->dim[3]; ++y_pos)
-                printf("%-5.1f ", fdata[0][x_pos][y_pos][ch]);
-                // printf("-- ");
-        }
-        printf("\n------------------------------------------------\n");
-    }
-    free(output);
+    // output = Conv2d(&kernel_full, &input_full, 1, 1);
+    // if(output == NULL){
+    //     printf("参数错误或计算错误\n");
+    //     return -1;
+    // }
+    // float (*fdata)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
+    // for(uint16_t ch=0; ch < output->dim[1]; ++ch){
+    //     for(uint16_t x_pos=0; x_pos<output->dim[2]; ++x_pos){
+    //         printf("\n");
+    //         for(uint16_t y_pos=0; y_pos<output->dim[3]; ++y_pos)
+    //             printf("%-5.1f ", fdata[0][x_pos][y_pos][ch]);
+    //             // printf("-- ");
+    //     }
+    //     printf("\n------------------------------------------------\n");
+    // }
+    // free(output);
 
     printf("ok!");
     return 1;

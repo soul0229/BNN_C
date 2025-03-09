@@ -50,9 +50,9 @@ data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t *input, uint8_t str
     output->dim[2] = output->dim[3];
     output->dim[1] = kernel->dim[0];
     output->dim[0] = 1;
-    output->data = calloc(output->dim[2]*output->dim[3]*output->dim[1], sizeof(int16_t)); 
-    output->len = TWO_BYTE;
-    int16_t (*data)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
+    output->data = calloc(output->dim[2]*output->dim[3]*output->dim[1], sizeof(float)); 
+    output->len = FLOAT_BYTE;
+    float (*data)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
     intx_t (*kernel_data)[kernel->dim[2]][kernel->dim[3]][kernel->dim[1]/DATA_LEN] = kernel->data;
     intx_t (*input_data)[input->dim[2]][input->dim[3]][input->dim[1]/DATA_LEN] = input->data;
 

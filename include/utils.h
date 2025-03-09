@@ -23,6 +23,7 @@ data_info_t *bachnorm(data_info_t *input, data_info_t *batchnorm);
 data_info_t *linear_data(data_info_t *input, data_info_t *linear);
 data_info_t *avg_pool(data_info_t *input, uint8_t size);
 data_info_t *hardtanh(data_info_t *input);
+int jpg_decode(char* name, data_info_t* data);
 
 
 void json_model_parse_v2(char* file_name);

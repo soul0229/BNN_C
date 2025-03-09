@@ -5,6 +5,7 @@
 #include "conv.h"
 #include "utils.h"
 #include "core.h"
+#include <string.h> 
 
 #define MAX_ACTIVATE_SIZE 64*32*32*4
 
@@ -67,8 +68,9 @@ static data_info_t *data_add(data_info_t *input1, data_info_t *input2){
 }
 
 static data_info_t *BasicBlock(data_info_t *input, common_t *basicBlock){
-    if(!input || input->data)return NULL;
-    data_info_t *net_args = (data_info_t *)basicBlock;
+    if(!input || input->data)
+        return NULL;
+    data_info_t *net_args = (data_info_t*)basicBlock->child;
     data_info_t *Ab = SignActivate(input);
     data_info_t *output = BinarizeConv2d(net_args, Ab, net_args->dim[0]/net_args->dim[1], 1);
     output = bachnorm(output, net_args = (data_info_t *)net_args->sibling);
@@ -79,8 +81,9 @@ static data_info_t *BasicBlock(data_info_t *input, common_t *basicBlock){
     output = BinarizeConv2d(net_args = (data_info_t *)net_args->sibling, Ab, net_args->dim[0]/net_args->dim[1], 1);
     output = bachnorm(output, net_args = (data_info_t *)net_args->sibling);
     data_info_t *shortcut = input;
-    if(((data_info_t *)basicBlock)->dim[0]/((data_info_t *)basicBlock)->dim[1] == 2){
-        shortcut = BinarizeConv2d(net_args = (data_info_t *)net_args->sibling, Ab, net_args->dim[0]/net_args->dim[1], 1);
+    if(((data_info_t *)basicBlock)->dim[0]/((data_info_t *)basicBlock)->dim[1] == 2 && ((data_info_t *)net_args->sibling)->type == TSHORTCUT){
+        net_args = (data_info_t *)((data_info_t *)net_args->sibling)->data;
+        shortcut = BinarizeConv2d(net_args, Ab, net_args->dim[0]/net_args->dim[1], 1);
         shortcut = bachnorm(shortcut, net_args = (data_info_t *)net_args->sibling);
         free(input->data);
         free(input);
@@ -93,59 +96,40 @@ static data_info_t *BasicBlock(data_info_t *input, common_t *basicBlock){
 
 data_info_t *net_inference(common_t *net, data_info_t *input){
     common_t *stage = net;
-    data_info_t *output = input, *shuortcut = NULL, *temp = NULL; //temp用于释放无用的中间结果
+    data_info_t *output = input; //temp用于释放无用的中间结果
     
     while(stage != NULL){
-        temp = output;
+
         switch(stage->type){
             case NET_ROOT:
             case TLAYER:
-                if(stage->child != NULL)
-                    output = net_inference((common_t *)stage->child, output);
-                if((common_t *)stage->sibling && ((common_t *)stage->sibling)->type != TLAYER)
-                    output = avg_pool(output, output->dim[3]);
-                break;
+                if(!stage->child || ((common_t *)stage->child)->type != TLAYER)
+                    printf("error");
+                    return NULL;
+                common_t *layer = (common_t *)stage->child;
+                output = BasicBlock(output,layer);
+                output = BasicBlock(output,layer = (common_t *)layer->sibling);
+               
             case TSHORTCUT:
-                if(stage->child != NULL)
-                    shuortcut = net_inference((common_t *)stage->child, input);
-
-                output = data_add(output, shuortcut);
-                output = hardtanh(output);
-                break;
+                printf("error");
+                return NULL;
             case TCONV:
-                if(((common_t *)stage->parent)->type == NET_ROOT)
-                    output = Conv2d((data_info_t *)stage, output, 1, 1);
-                else{
-                    output = data_binary(output);
-                    output = BinarizeConv2d((data_info_t *)stage, output, ((data_info_t *)stage)->dim[0]/((data_info_t *)stage)->dim[1], 1);
-                }
+
                 break;
             case TBATCHNORM:
+                if(((common_t *)stage->sibling)->type == TLINER)
+                    output = avg_pool(output, 4);
                 output = bachnorm(output, (data_info_t *)stage);
-                if((common_t *)stage->sibling == NULL){
-                    output = data_add(output, input);
-                    output = hardtanh(output);
-                }
-                else if(((common_t *)stage->parent)->type != TSHORTCUT && ((common_t *)stage->sibling)->type != TSHORTCUT && ((common_t *)stage->parent)->type == TLAYER){
-                    output = hardtanh(output);
-                }
                 break;
             case TLINER:
-                output = linear_data(output, (data_info_t *)stage);
+                
+                output = bachnorm(output, (data_info_t *)stage);
+            
                 break;
             default:break;
         }
-
-        if(temp && temp != input){
-            free(temp->data);
-            free(temp);
-            temp =NULL;
-        }
         stage = (common_t *)stage->sibling;
     }
-        free(input->data);
-        free(input);
-        input = NULL;
 
     return output;
 }

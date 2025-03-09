@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -11,6 +12,8 @@ typedef enum command{
     PARSE,
     LOAD,
     TEST,
+    DECODER,
+    INFERENCE,
     PRINT,
     CMD_NUM,
 }command_t;
@@ -23,11 +26,36 @@ void print_help() {
     printf("  -L, --load            Load .ml file in list table\n");
     printf("  -p, --print           Parse json file in list table\n");
     printf("  -T, --test            Internal test use\n");
+    printf("  -D, --decoder         Internal test use\n");
+    printf("  -I, --inference       model inference test\n");
     printf("  -h, --help            Show help information\n");
     printf("  -o, --output <file>   Output file name\n");
     printf("  -m, --model <model>   The model to run\n");
     printf("  -f, --file <file>     Specify the input file\n");
     printf("  -n, --name <string>   Specify a name\n");
+}
+
+void print_rgb_pixel(int r, int g, int b) {
+    // 使用 ANSI 转义序列设置背景颜色为 RGB 值
+    printf("\033[48;2;%d;%d;%dm  ", r, g, b); // 这会打印一个带有背景色的方块
+}
+
+void jpg_decoder_test(char *name){
+    data_info_t *jpg_RBG = malloc(sizeof(data_info_t));
+            
+    jpg_decode(name, jpg_RBG);
+    uint8_t (*data)[jpg_RBG->dim[2]][jpg_RBG->dim[3]] = jpg_RBG->data;
+    printf("\n");
+    
+    for(uint16_t dim2=0; dim2<jpg_RBG->dim[2];dim2++){
+        for(uint16_t dim1=0; dim1<jpg_RBG->dim[1];dim1++){
+            for(uint16_t dim3=0; dim3<jpg_RBG->dim[3];dim3++){
+                print_rgb_pixel(dim1==0?data[0][dim2][dim3]:0,dim1==1?data[1][dim2][dim3]:0,dim1==2?data[2][dim2][dim3]:0);
+            }
+        }
+        print_rgb_pixel(0xff,0xff,0xff);
+        printf("\n");
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -43,6 +71,8 @@ int main(int argc, char *argv[]) {
         {"load", no_argument, 0, 'L'},
         {"print", no_argument, 0, 'p'},
         {"test", no_argument, 0, 'T'},
+        {"decoder", no_argument, 0, 'D'},
+        {"inference", no_argument, 0, 'I'},
         {"model", required_argument, 0, 'm'},
         {"output", required_argument, 0, 'o'},
         {"file", required_argument, 0, 'f'},
@@ -52,13 +82,17 @@ int main(int argc, char *argv[]) {
     };
 
     // 解析命令行参数
-    while ((opt = getopt_long(argc, argv, "RPTLpo:f:m:n:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "RPTDLpo:f:m:n:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'R':cmd = RUN;
                     break;
             case 'P':cmd = PARSE;
                     break;
             case 'T':cmd = TEST;
+                    break;
+            case 'D':cmd = DECODER;
+                    break;
+            case 'I':cmd = INFERENCE;
                     break;
             case 'L':cmd = LOAD;
                     break;
@@ -101,6 +135,21 @@ int main(int argc, char *argv[]) {
         case TEST:
             extern void BConvTest();
             BConvTest();
+            break;
+        case DECODER:
+            if(!file){
+                eprint("file arguments error!\n");
+                print_help();
+                return -1;
+            }
+            jpg_decoder_test(file);
+            break;
+        case INFERENCE:
+            if(!file){
+                eprint("file arguments error!\n");
+                print_help();
+                return -1;
+            }
             break;
         case PRINT:
             load_ml_net(file);

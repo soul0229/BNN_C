@@ -41,8 +41,10 @@ data_info_t *Compose_RGB_data(data_info_t *input, enum DATASET_INFO dset_sel){
 }
 
 data_info_t *bachnorm(data_info_t *input, data_info_t *batchnorm){
-    if(input->dim[1] != batchnorm->dim[0])
+    if(input->dim[1] != batchnorm->dim[0] || batchnorm->type != TBATCHNORM){
+        printf("bachnorm error\n");
         return NULL;
+    }
     float (*bn)[batchnorm->dim[0]] = batchnorm->data;
 
     if(input->len == FLOAT_BYTE){
@@ -113,7 +115,7 @@ data_info_t *avg_pool(data_info_t *input, uint8_t size){
     for(uint16_t dim1; dim1 < input->dim[1]; ++dim1)
         for(uint16_t dim2; dim2 < input->dim[2]; ++dim2)
             for(uint16_t dim3; dim3 < input->dim[3]; ++dim3)
-                output[0][dim1][dim2/size][dim3/size]+= data[0][dim1][dim2][dim3];
+                output[0][dim1][dim2/size][dim3/size]+= data[0][dim2][dim3][dim1];
             
     for(uint16_t dim1; dim1 < input->dim[1]; ++dim1)
         for(uint16_t dim2; dim2 < input->dim[2]/size; ++dim2)
@@ -129,8 +131,10 @@ data_info_t *avg_pool(data_info_t *input, uint8_t size){
 }
 
 data_info_t *linear_data(data_info_t *input, data_info_t *linear){
-    if(!(input && input->data && linear && linear->data && linear->dim[1] == input->dim[1]))
+    if(!(input && input->data && linear && linear->data && linear->dim[1] == input->dim[1]) || linear->type != TLINER){
+        printf("linear data error!\n");
         return NULL;
+    }
     float (*data_A)[linear->dim[1]] = linear->data;
     float (*data_B)[input->dim[2]*input->dim[3]] = input->data;
     float (*output)[input->dim[2]*input->dim[3]] = calloc(linear->dim[0]*(input->dim[2])*(input->dim[3]), sizeof(float));
