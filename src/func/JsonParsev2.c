@@ -8,6 +8,7 @@
 #include "core.h"
 #include "utils.h"
 #include "loadNet.h"
+#include <math.h>
 
 const char *name_order[OMAX] = {[0]=WEIGHT, [1]=BIAS ALPHA, [2]=MEAN, [3]=VAR };
 const char *name_typ[] = {
@@ -64,6 +65,10 @@ static data_info_t *get_data_info(char *str, uint32_t dim[DIM_DEPTH]){
     char string_buff[16],*str_ptr = str;
     common_t *current = NULL, *last_stage = NULL;
     dbg_print("%s\n", str);
+
+    if(strstr(str_ptr,"module.") != NULL){
+        str_ptr = strchr(str_ptr, '.') + 1;
+    }
 
     while(*str_ptr && strchr(str_ptr, '.')){
         memset(string_buff, 0x00, sizeof(string_buff));
@@ -177,6 +182,7 @@ void printf_net_structure(common_t *data){
     while(stage != NULL){
         switch(stage->type){
             case NET_ROOT:
+            printf("NET_ROOT  ");
             case TLAYER:
             case TSHORTCUT:
                 printf("%.*s%.*s%.*s%s\n", tab_cnt, tabulate[0], 4, tabulate[1], ((int)(8-strlen(stage->name))/2 < 0)?0:(int)(8-strlen(stage->name))/2, "    ",  stage->name);
@@ -259,7 +265,6 @@ static void net_data_storage(common_t *data, FILE *file, uint32_t node_offset, u
                 node_offset += sibling_offset;
                 break;
             case TBATCHNORM:
-                data_size *= 3;
             case TCONV:
                 if(((data_info_t*)stage)->len == BINARY)
                     data_size/=32;
@@ -329,6 +334,7 @@ void storage_net(char *file_name){
 static void binary_net_data(common_t *data){
     common_t *stage = (data?data:(common_t *)Net);
     data_info_t *d_info = NULL;
+    float std[2][512] = {0};
     while(stage != NULL){
         switch(stage->type){
             case NET_ROOT:
@@ -349,8 +355,29 @@ static void binary_net_data(common_t *data){
                         for(uint16_t dim1 = 0; dim1 < d_info->dim[1]; dim1++){
                             for(uint16_t dim2 = 0; dim2 < d_info->dim[2]; dim2++){
                                 for(uint16_t dim3 = 0; dim3 < d_info->dim[3]; dim3++){
+                                    std[0][dim0]+=data[dim0][dim1][dim2][dim3];
+                                }
+                            }
+                        }
+                        std[0][dim0]/=(d_info->dim[1]*d_info->dim[2]*d_info->dim[3]);
+                    }
+                    // for(uint16_t dim0 = 0; dim0 < d_info->dim[0]; dim0++){
+                    //     for(uint16_t dim1 = 0; dim1 < d_info->dim[1]; dim1++){
+                    //         for(uint16_t dim2 = 0; dim2 < d_info->dim[2]; dim2++){
+                    //             for(uint16_t dim3 = 0; dim3 < d_info->dim[3]; dim3++){
+                    //                 std[1][dim0]+=(data[dim0][dim1][dim2][dim3] - std[0][dim0])*(data[dim0][dim1][dim2][dim3] - std[0][dim0]);
+                    //             }
+                    //         }
+                    //     }
+                    //     std[1][dim0]/=(d_info->dim[1]*d_info->dim[2]*d_info->dim[3]);
+                    // }
+
+                    for(uint16_t dim0 = 0; dim0 < d_info->dim[0]; dim0++){
+                        for(uint16_t dim1 = 0; dim1 < d_info->dim[1]; dim1++){
+                            for(uint16_t dim2 = 0; dim2 < d_info->dim[2]; dim2++){
+                                for(uint16_t dim3 = 0; dim3 < d_info->dim[3]; dim3++){
                                     binary[dim0][dim2][dim3][dim1/DATA_LEN] |= \
-                                    ((data[dim0][dim1][dim2][dim3]>0)?((ONE)>>(dim1%DATA_LEN)):((intx_t)(ZERO)));
+                                    (((data[dim0][dim1][dim2][dim3]-std[0][dim0]) < 0.0f)?((intx_t)(ZERO)):((ONE)<<(dim1%DATA_LEN)));
                                 }
                             }
                         }
@@ -362,6 +389,17 @@ static void binary_net_data(common_t *data){
                 }
                 break;
             case TBATCHNORM:
+                d_info = (data_info_t*)stage;
+                if(d_info->len == FLOAT_BYTE){
+                    float (*data)[d_info->dim[0]] = d_info->data;
+                    for(uint16_t ch = 0; ch < d_info->dim[0]; ++ch){
+                        data[OA][ch] = data[OWEIGHT][ch]/sqrt(data[OVAR][ch] + 1e-5);
+                        data[OB][ch] = data[OBIAS][ch] - data[OMEAN][ch] * data[OA][ch];
+                        data[OMEAN][ch] = 0;
+                        data[OVAR][ch] = 0;
+                    }
+                }
+                break;
             case TLINER:
                 break;
             default:break;
@@ -389,12 +427,19 @@ void printf_appoint_data(char *str, common_t *data){
         last_stage = current;
         str_ptr = strchr(str_ptr, '.') + 1;
     }
+    if(current == NULL && *str_ptr){
+        memset(string_buff, 0x00, sizeof(string_buff));
+        strncpy(string_buff, str_ptr, strlen(str_ptr));
+        current = grep_obj_child(last_stage, string_buff);
+    }
+
     if(current && current->type >= TCONV){
-        printf("%s\n", str);
+        printf("%s ", str);
+        
         uint32_t array_size, offset = 0;
         data_info_t *d_info = (data_info_t *)current;
         ARRAY_SIZE(d_info->dim, array_size);
-
+        printf("size[%d][%d][%d][%d]\n", d_info->dim[0], d_info->dim[1], d_info->dim[2], d_info->dim[3]);
         data_order_t order;
         for(order = OWEIGHT; order < OMAX; order++)
             if(strstr(name_order[order], strrchr(str, '.')+1) != NULL)
@@ -465,8 +510,9 @@ void printf_appoint_data(char *str, common_t *data){
                 break;
         }
     }
-    else if(current){
-        printf("storage type child size:%d\n",get_child_size((common_t*)current->child));
+    else if(current && (common_t*)current->child != NULL){
+        printf("storage type child node size:%d\n",get_child_size((common_t*)current->child));
+        printf_net_structure((common_t*)current->child);
     }
 }
 

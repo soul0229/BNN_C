@@ -61,7 +61,7 @@ int jpg_decode(char* name, data_info_t* data) {
             out[2][cinfo.output_scanline-1][x] = row[x*3+2];
         }
     }
-    data->dim[0] = 0;
+    data->dim[0] = 1;
     data->dim[1] = cinfo.output_components;
     data->dim[2] = cinfo.output_height;
     data->dim[3] = cinfo.output_width;

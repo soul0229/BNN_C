@@ -1,7 +1,7 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-#define DATA_LEN 8
+#define DATA_LEN 32
 #define USE_PADDING_ZERO
 #define SIZE 3
 #define RGB_DBG

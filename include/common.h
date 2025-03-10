@@ -31,19 +31,19 @@
 #endif
 #if (DATA_LEN == 8)
     #define intx_t int8_t
-    #define ONE     0x80
+    #define ONE     0x01
     #define ZERO    0x00
 #elif (DATA_LEN == 16)
     #define intx_t uint16_t
-    #define ONE     0x8000
+    #define ONE     0x0001
     #define ZERO    0x0000
 #elif (DATA_LEN == 32)
     #define intx_t uint32_t
-    #define ONE     0x80000000
+    #define ONE     0x00000001
     #define ZERO    0x00000000
 #elif (DATA_LEN == 64)
     #define intx_t uint64_t
-    #define ONE     0x8000000000000000
+    #define ONE     0x0000000000000001
     #define ZERO    0x0000000000000000
 #else
     #error "DATA_LEN error!"

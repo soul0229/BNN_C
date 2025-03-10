@@ -5,6 +5,7 @@
 #include "core.h"
 #include "utils.h"
 #include "loadNet.h"
+#include "net.h"
 
 typedef enum command{
     DEFAULT=0,
@@ -40,7 +41,7 @@ void print_rgb_pixel(int r, int g, int b) {
     printf("\033[48;2;%d;%d;%dm  ", r, g, b); // 这会打印一个带有背景色的方块
 }
 
-void jpg_decoder_test(char *name){
+data_info_t * jpg_decoder_test(char *name){
     data_info_t *jpg_RBG = malloc(sizeof(data_info_t));
             
     jpg_decode(name, jpg_RBG);
@@ -56,6 +57,7 @@ void jpg_decoder_test(char *name){
         print_rgb_pixel(0xff,0xff,0xff);
         printf("\n");
     }
+    return jpg_RBG;
 }
 
 int main(int argc, char *argv[]) {
@@ -82,7 +84,7 @@ int main(int argc, char *argv[]) {
     };
 
     // 解析命令行参数
-    while ((opt = getopt_long(argc, argv, "RPTDLpo:f:m:n:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "RPTDLIpo:f:m:n:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'R':cmd = RUN;
                     break;
@@ -145,11 +147,14 @@ int main(int argc, char *argv[]) {
             jpg_decoder_test(file);
             break;
         case INFERENCE:
-            if(!file){
-                eprint("file arguments error!\n");
+            if(!file || !model){
+                eprint("file arguments error!%d,%d\n",file==0,model==0);
                 print_help();
                 return -1;
             }
+            load_ml_net(model);
+            resnet18(jpg_decoder_test(file));
+            free_net((common_t**)&Net);
             break;
         case PRINT:
             load_ml_net(file);

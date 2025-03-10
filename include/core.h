@@ -14,7 +14,9 @@
 
 typedef enum data_order{
     OWEIGHT = 0,
+    OA = 0,
     OBIAS,
+    OB = 1,
     OMEAN,
     OVAR,
     OMAX,
