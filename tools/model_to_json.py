@@ -29,14 +29,14 @@ def main():
     parser = argparse.ArgumentParser(description="Convert a PyTorch model .th file to JSON format")
     
     # 定义命令行参数
-    parser.add_argument("model_file", type=str, help="Path to the .th model file")
-    parser.add_argument("output_file", type=str, help="Path to the output JSON file")
+    parser.add_argument('--model', type=str, default='./model.th', help="Path to the .th model file")
+    parser.add_argument("--output", type=str,  default='./model.json',help="Path to the output JSON file")
 
     # 解析命令行参数
     args = parser.parse_args()
 
     # 调用转换函数
-    convert_model_to_json(args.model_file, args.output_file)
+    convert_model_to_json(args.model, args.output)
 
 if __name__ == "__main__":
     main()

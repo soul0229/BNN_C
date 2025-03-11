@@ -350,7 +350,7 @@ static void binary_net_data(common_t *data){
                     ARRAY_SIZE(d_info->dim, array_size);
                     float (*data)[d_info->dim[1]][d_info->dim[2]][d_info->dim[3]] = d_info->data;
                     intx_t (*binary)[d_info->dim[2]][d_info->dim[3]][d_info->dim[1]/DATA_LEN] = malloc((array_size/32 + d_info->dim[0]) * sizeof(float));
-
+                    memset(binary,0x00,(array_size/32 + d_info->dim[0]) * sizeof(float));
                     for(uint16_t dim0 = 0; dim0 < d_info->dim[0]; dim0++){
                         for(uint16_t dim1 = 0; dim1 < d_info->dim[1]; dim1++){
                             for(uint16_t dim2 = 0; dim2 < d_info->dim[2]; dim2++){
@@ -377,7 +377,7 @@ static void binary_net_data(common_t *data){
                             for(uint16_t dim2 = 0; dim2 < d_info->dim[2]; dim2++){
                                 for(uint16_t dim3 = 0; dim3 < d_info->dim[3]; dim3++){
                                     binary[dim0][dim2][dim3][dim1/DATA_LEN] |= \
-                                    (((data[dim0][dim1][dim2][dim3]-std[0][dim0]) < 0.0f)?((intx_t)(ZERO)):((ONE)<<(dim1%DATA_LEN)));
+                                    (((data[dim0][dim1][dim2][dim3]-std[0][dim0]+1e-5) < 0.0f)?((intx_t)(ZERO)):((ONE)<<(dim1%DATA_LEN)));
                                 }
                             }
                         }

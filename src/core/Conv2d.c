@@ -55,6 +55,7 @@ data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t *input, uint8_t str
     float (*data)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
     intx_t (*kernel_data)[kernel->dim[2]][kernel->dim[3]][kernel->dim[1]/DATA_LEN] = kernel->data;
     intx_t (*input_data)[input->dim[2]][input->dim[3]][input->dim[1]/DATA_LEN] = input->data;
+    float result;
 
 
     if(input->dim[1] != kernel->dim[1] || input->dim[1]%DATA_LEN != 0){
@@ -83,10 +84,7 @@ data_info_t *BinarizeConv2d(data_info_t *kernel, data_info_t *input, uint8_t str
                             for (uint16_t in_ch = 0; in_ch < input->dim[1]/DATA_LEN; ++in_ch) {//in_channel/8:所有输入通道所占字节数
                                 data[0][x_pos/stride][y_pos/stride][out_ch] += \
                                     BIT_CONT((~(kernel_data[out_ch][kernel_xpos][kernel_ypos][in_ch] ^ input_data[0][x_input][y_input][in_ch]))&(~(xnor_in[0]<<DATA_LEN)));
-                                printf("out.dim[0][%d][%d][%d] = ~%08x ^%08x  ",out_ch,x_pos/stride,y_pos/stride, \
-                                    kernel_data[out_ch][kernel_xpos][kernel_ypos][in_ch],input_data[0][x_input][y_input][in_ch]);
                             }
-                            printf("\n");
                         }
                     }
                 }
