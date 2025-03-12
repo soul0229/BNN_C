@@ -21,76 +21,20 @@ char *CIFAR10_tag[] = { "飞机 (airplane)",
 
 extern const char *name_typ[];
 
-static data_info_t *SignActivate(data_info_t *activate){
-    if(activate->len != FLOAT_BYTE){
-        printf("SignActivate input data len error!\n");
-        return NULL;
-    }
-
-    data_info_t *temp = malloc(sizeof(data_info_t));
-    temp->dim[0] = activate->dim[0];
-    temp->dim[1] = activate->dim[1];
-    temp->dim[2] = activate->dim[2];
-    temp->dim[3] = activate->dim[3];
-    temp->len = BINARY;
-    temp->data = malloc(activate->dim[0]*activate->dim[1]*activate->dim[2]*activate->dim[3]/8);
-    memset(temp->data,0x00,activate->dim[0]*activate->dim[1]*activate->dim[2]*activate->dim[3]/8);
-
-    float (*data_in)[activate->dim[3]][activate->dim[1]] = activate->data;
-    uint8_t (*data_out)[activate->dim[3]][activate->dim[1]/8] = temp->data;
-
-    for(uint16_t dim2 = 0; dim2 < activate->dim[2]; ++dim2){
-        for(uint16_t dim3 = 0; dim3 < activate->dim[3]; ++dim3){
-            for(uint16_t dim1 = 0; dim1 < activate->dim[1]; ++dim1){
-                data_out[dim2][dim3][dim1/8] |= (((data_in[dim2][dim3][dim1] +1e-5) < 0)?0x00:(0x01<<(dim1%8)));
-            }
-        }
-    }
-    return temp;
-}
-
-
-static data_info_t *data_add(data_info_t *input1, data_info_t *input2){
-    if(!(input1 && input1->data && input1->len == FLOAT_BYTE))
-        return NULL;
-    if(!(input2 && input2->data && input2->len == FLOAT_BYTE))
-        return NULL;
-    if(input1->dim[0] != input2->dim[0] || input1->dim[1] != input2->dim[1] || input1->dim[2] != input2->dim[2] || input1->dim[3] != input2->dim[3]){
-        printf("data_add input1->dim[%d][%d][%d][%d] != input2->dim[%d][%d][%d][%d]\n", \
-            input1->dim[0], input1->dim[1], input1->dim[2], input1->dim[3], input2->dim[0], input2->dim[1], input2->dim[2], input2->dim[3]);
-        return NULL;
-    }
-    float (*data1)[input1->dim[2]][input1->dim[3]][input1->dim[1]] = input1->data;
-    float (*data2)[input2->dim[2]][input2->dim[3]][input2->dim[1]] = input2->data;
-
-    
-    for(uint16_t dim2 = 0; dim2 < input1->dim[2]; ++dim2)
-        for(uint16_t dim3 = 0; dim3 < input1->dim[3]; ++dim3)
-            for(uint16_t dim1 = 0; dim1 < input1->dim[1]; ++dim1)
-                data1[0][dim2][dim3][dim1] += data2[0][dim2][dim3][dim1];
-    free(input2->data);
-    free(input2);
-    input2 = NULL;
-    return input1;
-}
 
 static data_info_t *BasicBlock(data_info_t *input, common_t *basicBlock){
     if(!input || !input->data){
         return NULL;
     }    
-    // print_data(input);
-    // return NULL;
+
     data_info_t *net_args = (data_info_t*)basicBlock->child;
     data_info_t *Ab = SignActivate(input);
-    // binary_conv_data_trans(Ab, net_args);
-    // return NULL;
 
     data_info_t *output = BinarizeConv2d(net_args, Ab, net_args->dim[0]/net_args->dim[1], 1);
-
     net_args = (data_info_t *)net_args->sibling;
     output = bachnorm(output, net_args);
     output = hardtanh(output);
-    printf("%s:%d output->dim[%d][%d][%d][%d]\n",__FILE__,__LINE__, output->dim[0], output->dim[1], output->dim[2], output->dim[3]);
+    dbg_print("%s:%d output->dim[%d][%d][%d][%d]\n",__FILE__,__LINE__, output->dim[0], output->dim[1], output->dim[2], output->dim[3]);
 
     data_info_t *Ab2 = SignActivate(output);
     free(output->data);
@@ -105,7 +49,7 @@ static data_info_t *BasicBlock(data_info_t *input, common_t *basicBlock){
     data_info_t *shortcut = input;
     if(((data_info_t *)basicBlock->child)->dim[0]/((data_info_t *)basicBlock->child)->dim[1] == 2 && ((data_info_t *)net_args->sibling)->type == TSHORTCUT){
         net_args = (data_info_t *)((common_t *)net_args->sibling)->child;
-        printf("net_args type:%s \n",name_typ[TSHORTCUT]);
+        dbg_print("net_args type:%s \n",name_typ[TSHORTCUT]);
 
         shortcut = BinarizeConv2d(net_args, Ab, net_args->dim[0]/net_args->dim[1], 0);
         net_args = (data_info_t *)net_args->sibling;
@@ -131,13 +75,11 @@ data_info_t *net_inference(common_t *net, data_info_t *input){
     data_info_t *output = input; //temp用于释放无用的中间结果
     Compose_RGB_data(input, CIFAR);
 
-    // printf("%s:%d Compose_RGB_data ok\n",__FILE__,__LINE__);
     while(stage != NULL){
         if(output == NULL){ 
             printf("error output = NULL\n");
             return NULL;
         }
-        // printf("%s:%d in while stage->name:%s \n",__FILE__,__LINE__,stage->name);
         switch(stage->type){
             case NET_ROOT:
                 stage = (common_t *)stage->child;
@@ -148,11 +90,14 @@ data_info_t *net_inference(common_t *net, data_info_t *input){
                     return NULL;
                 }
                 common_t *layer = (common_t *)stage->child;
-                printf("layer name:%s\n", layer->name);
+                dbg_print("layer name:%s\n", layer->name);
                 output = BasicBlock(output,layer);
-                if(output==NULL)printf("BasicBlock error\n");
+                if(output==NULL){
+                    printf("BasicBlock error\n");
+                    return NULL;
+                }
                 layer = (common_t *)layer->sibling;
-                printf("layer name:%s\n", layer->name);
+                dbg_print("layer name:%s\n", layer->name);
                 output = BasicBlock(output,layer);
                 break;
             case TSHORTCUT:
@@ -164,7 +109,7 @@ data_info_t *net_inference(common_t *net, data_info_t *input){
                 free(input);
                 break;
             case TBATCHNORM:
-                printf("sibling type:%s\n",name_typ[((common_t *)stage->sibling)->type]);
+                dbg_print("sibling type:%s\n",name_typ[((common_t *)stage->sibling)->type]);
                 if(((common_t *)stage->sibling)->type == TLINER){
                     output = avg_pool(output, 4);
                 }
@@ -213,11 +158,17 @@ void resnet18(data_info_t *input){
     }
     float *result = output->data;
     for(uint16_t dim=0;dim < output->dim[0];dim++){
-        printf("%2.2f ",result[dim]);
         result_out[dim].value = result[dim];
     }
-    printf("\n");
+   
     qsort(result_out, 10, sizeof(Data), compare);
+    for(uint16_t dim=0;dim < output->dim[0];dim++){
+        if(dim == result_out[0].index)
+            printf("\033[30;41m%2.2f\033[0m\t",result[dim]);
+        else
+            printf("%2.2f\t",result[dim]);
+    } 
+    printf("\n");
     printf("最大值: %.2f, 标签: %d, 类别：%s\n", result_out[0].value, result_out[0].index, CIFAR10_tag[result_out[0].index]);
 
 }

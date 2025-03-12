@@ -19,10 +19,13 @@ enum DATASET_INFO {
 };
 
 data_info_t *Compose_RGB_data(data_info_t *input, enum DATASET_INFO dset_sel);
+data_info_t *SignActivate(data_info_t *activate);
+data_info_t *data_add(data_info_t *input1, data_info_t *input2);
 data_info_t *bachnorm(data_info_t *input, data_info_t *batchnorm);
 data_info_t *linear_data(data_info_t *input, data_info_t *linear);
 data_info_t *avg_pool(data_info_t *input, uint8_t size);
 data_info_t *hardtanh(data_info_t *input);
+
 int jpg_decode(char* name, data_info_t* data);
 void binary_conv_data_trans(data_info_t *Ab, data_info_t* Wb);
 void print_conv2d_output(data_info_t *output);

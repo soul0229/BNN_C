@@ -73,6 +73,6 @@ int jpg_decode(char* name, data_info_t* data) {
     jpeg_destroy_decompress(&cinfo);
     fclose(infile);
 
-    printf("Decoding completed.\n");
+    dbg_print("Decoding completed.\n");
     return 0;
 }

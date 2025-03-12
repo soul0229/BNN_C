@@ -377,7 +377,7 @@ static void binary_net_data(common_t *data){
                             for(uint16_t dim2 = 0; dim2 < d_info->dim[2]; dim2++){
                                 for(uint16_t dim3 = 0; dim3 < d_info->dim[3]; dim3++){
                                     binary[dim0][dim2][dim3][dim1/DATA_LEN] |= \
-                                    (((data[dim0][dim1][dim2][dim3]-std[0][dim0]+1e-5) < 0.0f)?((intx_t)(ZERO)):((ONE)<<(dim1%DATA_LEN)));
+                                    (((data[dim0][dim1][dim2][dim3]-std[0][dim0]) < 0.0f)?((intx_t)(ZERO)):((ONE)<<(dim1%DATA_LEN)));
                                 }
                             }
                         }

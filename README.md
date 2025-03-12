@@ -1,4 +1,7 @@
 # BNN_C
+
+## Description
+This code repository is an implementation of BNN inference framework based on C language.
 ## usage
 #### 1.clone this repository
 ```
@@ -6,7 +9,11 @@
 ```
 #### 2. create build directory
 ```
-    cd BNN_C && mkdir build && cd build
+    sudo apt update
+    sudo apt install cmake build-essential gcc libcjson-dev libjpeg-dev -y 
+    cd BNN_C && mkdir build
+    export BNN_C_PATH=$(pwd)
+    cd build
 ```
 #### 3. init cmake project
 ```
@@ -17,10 +24,18 @@
     make
 ```
 ## run
-#### 1. parse the net model
+#### 1. trans model.th to json file
 ```
-./BNN -P -f <model.json>
-
+    cd $BNN_C_PATH/tools
+    python model_to_json.py
+```
+#### 2. parse the net model
+```
+cd $BNN_C_PATH/build
+./BNN -P -f $BNN_C_PATH/model.json
+```
+Output is as follows:
+```
 |---resnet18.ml
 |       |--- conv1
 |       |---  bn1
@@ -80,3 +95,14 @@
 |       |--- linear
 |       |---  bn2
 ```
+#### Convert the CIFAR10 dataset to jpg
+```
+    cd $BNN_C_PATH/tools
+    python trans_cifar10_to_jpg.py --dataset <your cifar10 dataset path>
+```
+
+## test result
+![banner_wide_dark](test/test_result.png)
+
+## License
+All code except drivers in GPLDriver directory are licensed under BSD 2-Clause. GPL Drivers are licensed under GPLv2 license.

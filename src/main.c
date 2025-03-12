@@ -150,9 +150,21 @@ data_info_t jpg_RGB = {
     .len = ONE_BYTE,
 };
 
-void print_rgb_pixel(int r, int g, int b) {
-    // 使用 ANSI 转义序列设置背景颜色为 RGB 值
-    printf("\033[48;2;%d;%d;%dm  ", r, g, b); // 这会打印一个带有背景色的方块
+void print_rgb_pixel(uint16_t dim, uint8_t depth) {
+  
+    switch(dim){
+        case 0:
+            printf("\033[48;2;%d;0;0m%02x ", depth, depth);
+            break;
+        case 1:
+            printf("\033[48;2;0;%d;0m%02x ", depth, depth);
+            break;
+        case 2:
+            printf("\033[48;2;0;0;%dm%02x ", depth, depth);
+            break;
+        default:break;
+    }
+    
 }
 
 data_info_t * jpg_decoder_test(char *name){
@@ -160,17 +172,29 @@ data_info_t * jpg_decoder_test(char *name){
             
     jpg_decode(name, jpg_RBG);
     uint8_t (*data)[jpg_RBG->dim[2]][jpg_RBG->dim[3]] = jpg_RBG->data;
-    // printf("\n");
+    printf("\n");
     
-    // for(uint16_t dim2=0; dim2<jpg_RBG->dim[2];dim2++){
-    //     for(uint16_t dim1=0; dim1<jpg_RBG->dim[1];dim1++){
-    //         for(uint16_t dim3=0; dim3<jpg_RBG->dim[3];dim3++){
-    //             print_rgb_pixel(dim1==0?data[0][dim2][dim3]:0,dim1==1?data[1][dim2][dim3]:0,dim1==2?data[2][dim2][dim3]:0);
-    //         }
-    //     }
-    //     print_rgb_pixel(0xff,0xff,0xff);
-    //     printf("\n");
-    // }
+    for(uint16_t dim2=0; dim2<jpg_RBG->dim[2];dim2++){
+        for(uint16_t dim1=0; dim1<2;dim1++){
+            for(uint16_t dim3=0; dim3<jpg_RBG->dim[3];dim3++){
+                print_rgb_pixel(dim1, data[dim1][dim2][dim3]);
+            }
+        }
+        printf("\033[48;2;255;255;255m  \n");
+    }
+    for(uint16_t dim2=0; dim2<jpg_RBG->dim[2];dim2++){
+        for(uint16_t dim1=2; dim1<4;dim1++){
+            if(dim1 < 3)
+                for(uint16_t dim3=0; dim3<jpg_RBG->dim[3];dim3++){
+                    print_rgb_pixel(dim1, data[dim1][dim2][dim3]);
+                }
+            else 
+                for(uint16_t dim3=0; dim3<jpg_RBG->dim[3];dim3++){
+                    printf("\033[48;2;%d;%d;%dm   ",data[0][dim2][dim3], data[1][dim2][dim3], data[2][dim2][dim3]);
+            }
+        }
+        printf("\033[48;2;0;0;0m  \n");
+    }
 
     return jpg_RBG;
 }

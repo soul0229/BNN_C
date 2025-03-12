@@ -42,6 +42,58 @@ data_info_t *Compose_RGB_data(data_info_t *input, enum DATASET_INFO dset_sel){
     return input;
 }
 
+data_info_t *SignActivate(data_info_t *activate){
+    if(activate->len != FLOAT_BYTE){
+        printf("SignActivate input data len error!\n");
+        return NULL;
+    }
+
+    data_info_t *temp = malloc(sizeof(data_info_t));
+    temp->dim[0] = activate->dim[0];
+    temp->dim[1] = activate->dim[1];
+    temp->dim[2] = activate->dim[2];
+    temp->dim[3] = activate->dim[3];
+    temp->len = BINARY;
+    temp->data = malloc(activate->dim[0]*activate->dim[1]*activate->dim[2]*activate->dim[3]/8);
+    memset(temp->data,0x00,activate->dim[0]*activate->dim[1]*activate->dim[2]*activate->dim[3]/8);
+
+    float (*data_in)[activate->dim[3]][activate->dim[1]] = activate->data;
+    uint8_t (*data_out)[activate->dim[3]][activate->dim[1]/8] = temp->data;
+
+    for(uint16_t dim2 = 0; dim2 < activate->dim[2]; ++dim2){
+        for(uint16_t dim3 = 0; dim3 < activate->dim[3]; ++dim3){
+            for(uint16_t dim1 = 0; dim1 < activate->dim[1]; ++dim1){
+                data_out[dim2][dim3][dim1/8] |= ((data_in[dim2][dim3][dim1] < 0)?0x00:(0x01<<(dim1%8)));
+            }
+        }
+    }
+    return temp;
+}
+
+data_info_t *data_add(data_info_t *input1, data_info_t *input2){
+    if(!(input1 && input1->data && input1->len == FLOAT_BYTE))
+        return NULL;
+    if(!(input2 && input2->data && input2->len == FLOAT_BYTE))
+        return NULL;
+    if(input1->dim[0] != input2->dim[0] || input1->dim[1] != input2->dim[1] || input1->dim[2] != input2->dim[2] || input1->dim[3] != input2->dim[3]){
+        printf("data_add input1->dim[%d][%d][%d][%d] != input2->dim[%d][%d][%d][%d]\n", \
+            input1->dim[0], input1->dim[1], input1->dim[2], input1->dim[3], input2->dim[0], input2->dim[1], input2->dim[2], input2->dim[3]);
+        return NULL;
+    }
+    float (*data1)[input1->dim[2]][input1->dim[3]][input1->dim[1]] = input1->data;
+    float (*data2)[input2->dim[2]][input2->dim[3]][input2->dim[1]] = input2->data;
+
+    
+    for(uint16_t dim2 = 0; dim2 < input1->dim[2]; ++dim2)
+        for(uint16_t dim3 = 0; dim3 < input1->dim[3]; ++dim3)
+            for(uint16_t dim1 = 0; dim1 < input1->dim[1]; ++dim1)
+                data1[0][dim2][dim3][dim1] += data2[0][dim2][dim3][dim1];
+    free(input2->data);
+    free(input2);
+    input2 = NULL;
+    return input1;
+}
+
 // 位置敏感
 data_info_t *bachnorm(data_info_t *input, data_info_t *batchnorm){
     if(input->dim[1] != batchnorm->dim[0] || batchnorm->dim[1] != 1 || batchnorm->dim[2] != 1 || batchnorm->dim[3] != 1 \
@@ -157,41 +209,41 @@ data_info_t *linear_data(data_info_t *input, data_info_t *linear){
 void binary_conv_data_trans(data_info_t *Ab, data_info_t* Wb){
     uint8_t (*Adata)[Ab->dim[2]][Ab->dim[3]][Ab->dim[1]/8] = Ab->data;
     uint8_t (*Wdata)[Wb->dim[2]][Wb->dim[3]][Wb->dim[1]/8] = Wb->data;
-    // printf("uint8_t kernel_L[%d][%d][%d][%d/8] = {\n", Wb->dim[0],Wb->dim[2],Wb->dim[3],Wb->dim[1]);
-    // for(uint16_t dim0=0;dim0<Wb->dim[0];dim0++){
-    //     printf("\t{\n");
-    //     for(uint16_t dim2=0;dim2<Wb->dim[2];dim2++){
-    //         printf("\t\t{\n");
-    //         for(uint16_t dim3=0;dim3<Wb->dim[3];dim3++){
-    //             printf("\t\t\t{");
-    //             for(uint16_t dim1=0;dim1<(Wb->dim[1]/8);dim1++){
-    //                 printf("0x%02x, ",Wdata[dim0][dim2][dim3][dim1]);
-    //             }
-    //             printf("},\n");
-    //         }
-    //         printf("\t\t},\n");
-    //     }
-    //     printf("\t},\n");
-    // }
-    // printf("};\n");
+    printf("uint8_t kernel_L[%d][%d][%d][%d/8] = {\n", Wb->dim[0],Wb->dim[2],Wb->dim[3],Wb->dim[1]);
+    for(uint16_t dim0=0;dim0<Wb->dim[0];dim0++){
+        printf("\t{\n");
+        for(uint16_t dim2=0;dim2<Wb->dim[2];dim2++){
+            printf("\t\t{\n");
+            for(uint16_t dim3=0;dim3<Wb->dim[3];dim3++){
+                printf("\t\t\t{");
+                for(uint16_t dim1=0;dim1<(Wb->dim[1]/8);dim1++){
+                    printf("0x%02x, ",Wdata[dim0][dim2][dim3][dim1]);
+                }
+                printf("},\n");
+            }
+            printf("\t\t},\n");
+        }
+        printf("\t},\n");
+    }
+    printf("};\n");
 
-    // printf("uint8_t activate_L[%d][%d][%d][%d/8] = {\n", Ab->dim[0],Ab->dim[2],Ab->dim[3],Ab->dim[1]);
-    // for(uint16_t dim0=0;dim0<Ab->dim[0];dim0++){
-    //     printf("\t{\n");
-    //     for(uint16_t dim2=0;dim2<Ab->dim[2];dim2++){
-    //         printf("\t\t{\n");
-    //         for(uint16_t dim3=0;dim3<Ab->dim[3];dim3++){
-    //             printf("\t\t\t{");
-    //             for(uint16_t dim1=0;dim1<(Ab->dim[1]/8);dim1++){
-    //                 printf("0x%02x, ",Adata[dim0][dim2][dim3][dim1]);
-    //             }
-    //             printf("},\n");
-    //         }
-    //         printf("\t\t},\n");
-    //     }
-    //     printf("\t},\n");
-    // }
-    // printf("};\n");
+    printf("uint8_t activate_L[%d][%d][%d][%d/8] = {\n", Ab->dim[0],Ab->dim[2],Ab->dim[3],Ab->dim[1]);
+    for(uint16_t dim0=0;dim0<Ab->dim[0];dim0++){
+        printf("\t{\n");
+        for(uint16_t dim2=0;dim2<Ab->dim[2];dim2++){
+            printf("\t\t{\n");
+            for(uint16_t dim3=0;dim3<Ab->dim[3];dim3++){
+                printf("\t\t\t{");
+                for(uint16_t dim1=0;dim1<(Ab->dim[1]/8);dim1++){
+                    printf("0x%02x, ",Adata[dim0][dim2][dim3][dim1]);
+                }
+                printf("},\n");
+            }
+            printf("\t\t},\n");
+        }
+        printf("\t},\n");
+    }
+    printf("};\n");
 
     printf("float kernel_L_f[%d][%d][%d][%d] = {\n", Wb->dim[0],Wb->dim[1],Wb->dim[2],Wb->dim[3]);
     for(uint16_t dim0=0;dim0<Wb->dim[0];dim0++){
@@ -229,42 +281,42 @@ void binary_conv_data_trans(data_info_t *Ab, data_info_t* Wb){
     }
     printf("};\n");
 
-    // printf("dim[%d][%d][%d][%d]\n", Wb->dim[0],Wb->dim[1],Wb->dim[2],Wb->dim[3]);
-    // printf("conv_kernel_L = torch.tensor([\n");
-    // for(uint16_t dim0=0;dim0<Wb->dim[0];dim0++){
-    //     printf("\t[\n");
-    //     for(uint16_t dim1=0;dim1<(Wb->dim[1]);dim1++){
-    //         printf("\t\t[\n");
-    //         for(uint16_t dim2=0;dim2<Wb->dim[2];dim2++){
-    //             printf("\t\t\t[");
-    //             for(uint16_t dim3=0;dim3<Wb->dim[3];dim3++){
-    //                 printf("%d.0, ",((Wdata[dim0][dim2][dim3][dim1/8]>>(dim1%8))&0x01?1:-1));
-    //             }
-    //             printf("],\n");
-    //         }
-    //         printf("\t\t],\n");
-    //     }
-    //     printf("\t],\n");
-    // }
-    // printf("], dtype=torch.float32)\n");
+    printf("dim[%d][%d][%d][%d]\n", Wb->dim[0],Wb->dim[1],Wb->dim[2],Wb->dim[3]);
+    printf("conv_kernel_L = torch.tensor([\n");
+    for(uint16_t dim0=0;dim0<Wb->dim[0];dim0++){
+        printf("\t[\n");
+        for(uint16_t dim1=0;dim1<(Wb->dim[1]);dim1++){
+            printf("\t\t[\n");
+            for(uint16_t dim2=0;dim2<Wb->dim[2];dim2++){
+                printf("\t\t\t[");
+                for(uint16_t dim3=0;dim3<Wb->dim[3];dim3++){
+                    printf("%d.0, ",((Wdata[dim0][dim2][dim3][dim1/8]>>(dim1%8))&0x01?1:-1));
+                }
+                printf("],\n");
+            }
+            printf("\t\t],\n");
+        }
+        printf("\t],\n");
+    }
+    printf("], dtype=torch.float32)\n");
 
-    // printf("mc_input_data_L = torch.tensor([\n");
-    // for(uint16_t dim0=0;dim0<Ab->dim[0];dim0++){
-    //     printf("\t[\n");
-    //     for(uint16_t dim1=0;dim1<(Ab->dim[1]);dim1++){
-    //         printf("\t\t[\n");
-    //         for(uint16_t dim2=0;dim2<Ab->dim[2];dim2++){
-    //             printf("\t\t\t[");
-    //             for(uint16_t dim3=0;dim3<Ab->dim[3];dim3++){
-    //                 printf("%d.0, ",((Adata[dim0][dim2][dim3][dim1/8]>>(dim1%8))&0x01)?1:-1);
-    //             }
-    //             printf("],\n");
-    //         }
-    //         printf("\t\t],\n");
-    //     }
-    //     printf("\t],\n");
-    // }
-    // printf("], dtype=torch.float32)\n");
+    printf("mc_input_data_L = torch.tensor([\n");
+    for(uint16_t dim0=0;dim0<Ab->dim[0];dim0++){
+        printf("\t[\n");
+        for(uint16_t dim1=0;dim1<(Ab->dim[1]);dim1++){
+            printf("\t\t[\n");
+            for(uint16_t dim2=0;dim2<Ab->dim[2];dim2++){
+                printf("\t\t\t[");
+                for(uint16_t dim3=0;dim3<Ab->dim[3];dim3++){
+                    printf("%d.0, ",((Adata[dim0][dim2][dim3][dim1/8]>>(dim1%8))&0x01)?1:-1);
+                }
+                printf("],\n");
+            }
+            printf("\t\t],\n");
+        }
+        printf("\t],\n");
+    }
+    printf("], dtype=torch.float32)\n");
 }
 
 void print_conv2d_output(data_info_t *output){
