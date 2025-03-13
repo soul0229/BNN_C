@@ -63,7 +63,7 @@ data_info_t *SignActivate(data_info_t *activate){
     for(uint16_t dim2 = 0; dim2 < activate->dim[2]; ++dim2){
         for(uint16_t dim3 = 0; dim3 < activate->dim[3]; ++dim3){
             for(uint16_t dim1 = 0; dim1 < activate->dim[1]; ++dim1){
-                data_out[dim2][dim3][dim1/8] |= ((data_in[dim2][dim3][dim1] < 0)?0x00:(0x01<<(dim1%8)));
+                data_out[dim2][dim3][dim1/8] |= (((data_in[dim2][dim3][dim1] )< 0)?0x00:(0x01<<(dim1%8)));
             }
         }
     }
@@ -206,6 +206,50 @@ data_info_t *linear_data(data_info_t *input, data_info_t *linear){
     return input;
 }
 
+static void print_rgb_pixel(uint16_t dim, uint8_t depth) {
+  
+    switch(dim){
+        case 0:
+            printf("\033[48;2;%d;0;0m%02x ", depth, depth);
+            break;
+        case 1:
+            printf("\033[48;2;0;%d;0m%02x ", depth, depth);
+            break;
+        case 2:
+            printf("\033[48;2;0;0;%dm%02x ", depth, depth);
+            break;
+        default:break;
+    }
+    
+}
+
+void print_RGB_data(data_info_t *jpg_RBG){
+    uint8_t (*data)[jpg_RBG->dim[2]][jpg_RBG->dim[3]] = jpg_RBG->data;
+    
+    for(uint16_t dim2=0; dim2<jpg_RBG->dim[2];dim2++){
+        for(uint16_t dim1=0; dim1<2;dim1++){
+            for(uint16_t dim3=0; dim3<jpg_RBG->dim[3];dim3++){
+                print_rgb_pixel(dim1, data[dim1][dim2][dim3]);
+            }
+        }
+        printf("\033[48;2;255;255;255m  \n");
+    }
+    for(uint16_t dim2=0; dim2<jpg_RBG->dim[2];dim2++){
+        for(uint16_t dim1=2; dim1<4;dim1++){
+            if(dim1 < 3)
+                for(uint16_t dim3=0; dim3<jpg_RBG->dim[3];dim3++){
+                    print_rgb_pixel(dim1, data[dim1][dim2][dim3]);
+                }
+            else 
+                for(uint16_t dim3=0; dim3<jpg_RBG->dim[3];dim3++){
+                    printf("\033[48;2;%d;%d;%dm   ",data[0][dim2][dim3], data[1][dim2][dim3], data[2][dim2][dim3]);
+            }
+        }
+        printf("\033[48;2;0;0;0m  \n");
+    }
+
+}
+
 void binary_conv_data_trans(data_info_t *Ab, data_info_t* Wb){
     uint8_t (*Adata)[Ab->dim[2]][Ab->dim[3]][Ab->dim[1]/8] = Ab->data;
     uint8_t (*Wdata)[Wb->dim[2]][Wb->dim[3]][Wb->dim[1]/8] = Wb->data;
@@ -319,20 +363,7 @@ void binary_conv_data_trans(data_info_t *Ab, data_info_t* Wb){
     printf("], dtype=torch.float32)\n");
 }
 
-void print_conv2d_output(data_info_t *output){
-    float (*fdata)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
-    for(uint16_t ch=0; ch < output->dim[1]; ++ch){
-        for(uint16_t x_pos=0; x_pos<output->dim[2]; ++x_pos){
-            printf("\n");
-            for(uint16_t y_pos=0; y_pos<output->dim[3]; ++y_pos)
-                printf("%-5.1f ", fdata[0][x_pos][y_pos][ch]);
-                // printf("-- ");
-        }
-        printf("\n------------------------------------------------\n");
-    }
-}
-
-void print_data_jpg(data_info_t *input){
+void print_normal_order_data(data_info_t *input){
     float (*data)[input->dim[1]][input->dim[2]][input->dim[3]] = input->data;
     printf("float data1[%d][%d][%d][%d] = {\n",input->dim[0],input->dim[1],input->dim[2],input->dim[3]);
     for(uint16_t dim0=0;dim0<input->dim[0];dim0++){
@@ -358,19 +389,19 @@ void print_data(data_info_t *input){
     float (*data)[input->dim[2]][input->dim[3]][input->dim[1]] = input->data;
     printf("float data1[%d][%d][%d][%d] = {\n",input->dim[0],input->dim[1],input->dim[2],input->dim[3]);
     for(uint16_t dim0=0;dim0<input->dim[0];dim0++){
-        printf("\t{\n");
+        printf("    {\n");
         for(uint16_t dim1=0;dim1<(input->dim[1]);dim1++){
-            printf("\t\t{\n");
+            printf("        {\n");
             for(uint16_t dim2=0;dim2<input->dim[2];dim2++){
-                printf("\t\t\t{");
+                printf("            {");
                 for(uint16_t dim3=0;dim3<input->dim[3];dim3++){
                     printf("%.3f, ",data[dim0][dim2][dim3][dim1]);
                 }
                 printf("},\n");
             }
-            printf("\t\t},\n");
+            printf("        },\n");
         }
-        printf("\t},\n");
+        printf("    },\n");
     }
     printf("};\n");
 }

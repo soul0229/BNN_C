@@ -27,9 +27,9 @@ data_info_t *avg_pool(data_info_t *input, uint8_t size);
 data_info_t *hardtanh(data_info_t *input);
 
 int jpg_decode(char* name, data_info_t* data);
+void print_RGB_data(data_info_t *jpg_RBG);
 void binary_conv_data_trans(data_info_t *Ab, data_info_t* Wb);
-void print_conv2d_output(data_info_t *output);
-void print_data_jpg(data_info_t *input);
+void print_normal_order_data(data_info_t *input);
 void print_data(data_info_t *input);
 
 

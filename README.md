@@ -5,29 +5,29 @@ This code repository is an implementation of BNN inference framework based on C 
 ## usage
 #### 1.clone this repository
 ```
-    git clone https://github.com/soul0229/BNN_C.git
+git clone https://github.com/soul0229/BNN_C.git
 ```
 #### 2. create build directory
 ```
-    sudo apt update
-    sudo apt install cmake build-essential gcc libcjson-dev libjpeg-dev -y 
-    cd BNN_C && mkdir build
-    export BNN_C_PATH=$(pwd)
-    cd build
+sudo apt update
+sudo apt install cmake build-essential gcc libcjson-dev libjpeg-dev -y 
+cd BNN_C && mkdir build
+export BNN_C_PATH=$(pwd)
+cd build
 ```
 #### 3. init cmake project
 ```
-    cmake ..
+cmake ..
 ```
 #### 4. make this project
 ```
-    make
+make
 ```
 ## run
 #### 1. trans model.th to json file
 ```
-    cd $BNN_C_PATH/tools
-    python model_to_json.py
+cd $BNN_C_PATH/tools
+python model_to_json.py
 ```
 #### 2. parse the net model
 ```
@@ -92,16 +92,20 @@ Output is as follows:
 |       |       |       |---  bn1
 |       |       |       |--- conv2
 |       |       |       |---  bn2
-|       |--- linear
 |       |---  bn2
+|       |--- linear
 ```
 #### Convert the CIFAR10 dataset to jpg
 ```
-    cd $BNN_C_PATH/tools
-    python trans_cifar10_to_jpg.py --dataset <your cifar10 dataset path>
+cd $BNN_C_PATH/tools
+python trans_cifar10_to_jpg.py --dataset <your cifar10 dataset path>
 ```
 
 ## test result
+```
+cd $BNN_C_PATH/build
+./BNN - I -m resnet18.ml -f <cifar10 test dataset jpg path>
+```
 ![banner_wide_dark](test/test_result.png)
 
 ## License

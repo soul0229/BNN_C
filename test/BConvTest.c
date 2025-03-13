@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "utils.h"
 #define KERNEL_SIZE (SIZE*SIZE)
 
 /* 以下代码用于测试验证XNOR卷积操作 */
@@ -50754,20 +50755,12 @@ static data_info_t input_full_L = {
 
 static int test(void){
     data_info_t *output;
-    output = BinarizeConv2d(&kernel_large, &input_large, 1, 1);
+    output = BinarizeConv2d(&kernel_1x1, &input, 2, 0);
     if(output == NULL){
         printf("参数错误或计算错误\n");
         return -1;
     }
-    float (*data)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
-    for(uint16_t ch=0; ch < output->dim[1]; ++ch){
-        for(uint16_t x_pos=0; x_pos<output->dim[2]; ++x_pos){
-            printf("\n");
-            for(uint16_t y_pos=0; y_pos < output->dim[3]; ++y_pos)
-                printf("%-5.1f ", data[0][x_pos][y_pos][ch]);
-        }
-        printf("\n------------------------------------------------\n");
-    }
+	print_data(output);
     free(output);
 
     printf("\n\n\n\n");
@@ -50776,71 +50769,11 @@ static int test(void){
         printf("参数错误或计算错误\n");
         return -1;
     }
-    float (*fdata)[output->dim[2]][output->dim[3]][output->dim[1]] = output->data;
-    for(uint16_t ch=0; ch < output->dim[1]; ++ch){
-        for(uint16_t x_pos=0; x_pos<output->dim[2]; ++x_pos){
-            printf("\n");
-            for(uint16_t y_pos=0; y_pos<output->dim[3]; ++y_pos)
-                printf("%-5.1f ", fdata[0][x_pos][y_pos][ch]);
-                // printf("-- ");
-        }
-        printf("\n------------------------------------------------\n");
-    }
+	print_data(output);
     free(output);
 
     printf("ok!");
     return 1;
-}
-
-void trans_tensor(data_info_t *kernel, data_info_t *active, bool depthwise){
-    uint8_t byte_num;
-    if(depthwise){
-        byte_num = kernel->dim[1]/DATA_LEN;
-        intx_t (*data)[kernel->dim[2]][kernel->dim[3]][kernel->dim[1/DATA_LEN]] = kernel->data;
-        for(uint16_t out_ch=0;out_ch<kernel->dim[0]; ++out_ch){
-            printf("[\n");
-            for(uint16_t in_ch=0;in_ch<kernel->dim[1]; ++in_ch){
-                printf("    {\n");
-                for(uint16_t x_size=0;x_size<kernel->dim[2]; ++x_size){
-                    printf("        {");
-                    for(uint16_t y_size=0;y_size<kernel->dim[3]; ++y_size)
-                        printf("%d.0, ",(((data[out_ch][x_size][y_size][in_ch/DATA_LEN]>>(in_ch%DATA_LEN))&0x01)?1:-1));
-                    printf("},\n");
-                }
-                printf("    },\n");
-            }
-            printf("},\n");
-        }
-    }
-    else{
-        byte_num = kernel->dim[0]/DATA_LEN;
-        for(uint16_t out_ch=0;out_ch<kernel->dim[0]; ++out_ch){
-            printf("[\n");
-            for(uint16_t in_ch=0;in_ch<active->dim[1]; ++in_ch){
-                printf("    {\n");
-                for(uint16_t x_size=0;x_size<kernel->dim[2]; ++x_size){
-                    printf("        {");
-                    for(uint16_t y_size=0;y_size<kernel->dim[3]; ++y_size)
-                        printf("%d.0, ",(((((intx_t*)(kernel->data))[x_size*kernel->dim[3]*byte_num+y_size*byte_num+out_ch/DATA_LEN]>>(out_ch%DATA_LEN))&0x01)?1:-1));
-                    printf("},\n");
-                }
-                printf("    },\n");
-            }
-            printf("},\n");
-        }
-    }
-
-    byte_num = active->dim[1]/DATA_LEN;
-    for(uint16_t in_ch=0;in_ch<active->dim[1]; ++in_ch){
-        printf("    {\n");
-        for(uint16_t x_size=0;x_size<active->dim[2]; ++x_size){
-            printf("        {");
-            for(uint16_t y_size=0;y_size<active->dim[3]; ++y_size)
-                printf("%d.0, ",(((((intx_t*)(active->data))[x_size*active->dim[3]*byte_num+y_size*byte_num+in_ch/DATA_LEN]>>in_ch%DATA_LEN)&0x01)?1:-1));
-            printf("},\n");
-        }
-        printf("    },\n");
-    }
 }
 
 void cmp_data(void* data1, void* data2, uint16_t dim[4]){
@@ -50865,8 +50798,8 @@ void cmp_data(void* data1, void* data2, uint16_t dim[4]){
 void BConvTest(){
     // uint16_t dim1[4] = {64, 64, 3, 3};
     // cmp_data(&py_w, &kernel_L_f,dim1);
-    uint16_t dim2[4] = {1, 64, 32, 32};
-    cmp_data(&py_a, &activate_L_f,dim2);
-    // trans_tensor(&kernel_t, &input, 1);
-    // test();
+    // uint16_t dim2[4] = {1, 64, 32, 32};
+    // cmp_data(&py_a, &activate_L_f,dim2);
+    // binary_conv_data_trans(&kernel_t, &input);
+    test();
 }

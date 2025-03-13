@@ -23648,14 +23648,15 @@ mc_input_data_L = torch.tensor([
 
 # 使用自定义的卷积核进行深度卷积
 # mc_input_data = F.pad(mc_input_data, (1, 1, 1, 1), mode='constant', value=-1)
-depthwise_output = F.conv2d(mc_input_data_L, conv_kernel_L, padding=1, stride=1)
+# depthwise_output = F.conv2d(mc_input_data_L, conv_kernel_L, padding=1, stride=1)
+depthwise_output = F.conv2d(mc_input_data, mc_conv_kernels, padding=1, stride=1)
 # depthwise_output = F.conv2d(mc_input_data, mc_conv_kernels_1x1, padding=0, stride=2)
 # # 将多个输出通道合并为一个输出通道
 # combined_output = depthwise_output.sum(dim=1, keepdim=True)
 
 # 输出结果
-print("Input data shape:", mc_input_data_L.shape)
-print("Custom convolution kernels shape:", conv_kernel_L.shape)
+print("Input data shape:", mc_input_data.shape)
+print("Custom convolution kernels shape:", mc_conv_kernels.shape)
 # print("Depthwise output shape:", depthwise_output.shape)
 print("Example output data:\n", depthwise_output)
 print("Example output shape:\n", depthwise_output.shape)

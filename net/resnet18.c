@@ -115,7 +115,7 @@ data_info_t *net_inference(common_t *net, data_info_t *input){
                 }
                 output = bachnorm(output, (data_info_t *)stage);
                 
-                // if(strstr(stage->name,"bn1") !=0)
+                // if(strstr(stage->name,"bn1") == stage->name)
                 //     output = hardtanh(output);
                 break;
             case TLINER:
@@ -148,7 +148,7 @@ int compare(const void *a, const void *b) {
     return dataB->value - dataA->value;
 }
 
-void resnet18(data_info_t *input){
+void resnet18(data_info_t *input, char *file){
     if(!input)
         return;
     data_info_t *output = net_inference(NULL, input);
@@ -162,13 +162,14 @@ void resnet18(data_info_t *input){
     }
    
     qsort(result_out, 10, sizeof(Data), compare);
-    for(uint16_t dim=0;dim < output->dim[0];dim++){
-        if(dim == result_out[0].index)
-            printf("\033[30;41m%2.2f\033[0m\t",result[dim]);
-        else
-            printf("%2.2f\t",result[dim]);
-    } 
-    printf("\n");
-    printf("最大值: %.2f, 标签: %d, 类别：%s\n", result_out[0].value, result_out[0].index, CIFAR10_tag[result_out[0].index]);
-
+    // for(uint16_t dim=0;dim < output->dim[0];dim++){
+    //     if(dim == result_out[0].index)
+    //         printf("\033[30;41m%2.2f\033[0m\t",result[dim]);
+    //     else
+    //         printf("%2.2f\t",result[dim]);
+    // } 
+    // printf("\n");
+    // printf("最大值: %.2f, 标签: %d, 类别：%s\n", result_out[0].value, result_out[0].index, CIFAR10_tag[result_out[0].index]);
+    char find_index = '/';
+    printf("%s\tindex:%c \toutput:%d\n",(strrchr(file, find_index)+1),*(strrchr(file, find_index)+1),result_out[0].index);
 }
