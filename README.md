@@ -3,7 +3,7 @@
 ## Description
 This code repository is an implementation of BNN inference framework based on C language.
 
-The esp32s3 deployment implements [hear](https://github.com/soul0229/esp_bnn).
+The esp32s3 deployment implements [here](https://github.com/soul0229/esp_bnn).
 ## usage
 #### 1.clone this repository
 ```
